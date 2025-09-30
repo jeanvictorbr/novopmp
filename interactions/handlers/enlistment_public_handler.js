@@ -1,4 +1,5 @@
 // Local: interactions/handlers/enlistment_public_handler.js
+// (Este arquivo está correto, não precisa de alterações da última versão, mas substitua-o para garantir a integridade)
 
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../../database/db.js');
@@ -15,18 +16,14 @@ module.exports = {
             if (action === 'reject') return await this.handleApproval(interaction, 'rejected');
         } catch (error) { console.error(`Erro no handler público de alistamento:`, error); }
     },
-
     async handleStartProcess(interaction) {
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
-        // FLUXO CONDICIONAL
         if (activeQuizId) {
-            // Se a prova estiver ativa, mas o user não tiver o cargo, ele é barrado
             const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
             if (!quizPassedRoleId || !interaction.member.roles.cache.has(quizPassedRoleId)) {
                 return interaction.reply({ content: '❌ Você precisa primeiro ser aprovado na prova teórica para se alistar.', ephemeral: true });
             }
         }
-        // Se a prova não estiver ativa, OU se o user já tiver o cargo de aprovado, mostra o formulário
         const existingRequest = await db.get('SELECT * FROM enlistment_requests WHERE user_id = $1 AND status = $2', [interaction.user.id, 'pending']);
         if (existingRequest) return interaction.reply({ content: `❌ Você já possui uma ficha em análise.`, ephemeral: true });
 
@@ -37,7 +34,6 @@ module.exports = {
         );
         await interaction.showModal(modal);
     },
-
     async handleEnlistmentModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const rpName = interaction.fields.getTextInputValue('rp_name');
@@ -59,7 +55,6 @@ module.exports = {
         await channel.send({ content: `Atenção, <@&${recruiterRoleId}>!`, embeds: [embed], components: [buttons] });
         await interaction.editReply({ content: '✅ Sua ficha foi enviada para análise! Você será notificado sobre o resultado final.', components: [] });
     },
-
     async handleApproval(interaction, newStatus) {
         await interaction.deferUpdate();
         const requestId = interaction.customId.split('_').pop();
