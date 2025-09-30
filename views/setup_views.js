@@ -385,7 +385,6 @@ async function getTagsMenuPayload(db, guild) {
   if (tags.length > 0) {
     let tagList = '';
     for (const t of tags) {
-        // Usa o cache do servidor (guild) para encontrar o nome do cargo, que é mais rápido e confiável
         const role = guild.roles.cache.get(t.role_id);
         tagList += `\`[${t.tag}]\` - ${role ? role.name : 'Cargo não encontrado'}\n`;
     }
@@ -400,13 +399,13 @@ async function getTagsMenuPayload(db, guild) {
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
   
-  // NOVO: Botão de Sincronização
   const syncButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('tags_sync_all').setLabel('Sincronizar Todos').setStyle(ButtonStyle.Primary).setEmoji('🔄')
   );
 
   return { embeds: [embed], components: [buttons, syncButton] };
 }
+
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
 module.exports = {

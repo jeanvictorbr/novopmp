@@ -62,7 +62,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
         }
         if (!handler) handler = client.handlers.get(key);
-        if (!handler) return console.error(`[AVISO] Nenhum handler encontrado para: ${key}`);
+
+        if (!handler) {
+            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
+        }
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
