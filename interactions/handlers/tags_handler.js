@@ -14,7 +14,7 @@ const tagsHandler = {
             if (customId === 'tags_role_select') return await this.showTagModal(interaction);
             if (customId.startsWith('tags_set_tag_modal')) return await this.handleSetTag(interaction);
             if (customId === 'tags_remove_select') return await this.handleRemoveTag(interaction);
-            if (customId === 'tags_sync_all') return await this.syncAllTags(interaction); // NOVA FUNÇÃO
+            if (customId === 'tags_sync_all') return await this.syncAllTags(interaction);
 
         } catch (error) {
             console.error(`Erro no handler de tags (${customId}):`, error);
@@ -22,7 +22,7 @@ const tagsHandler = {
     },
 
     async showRoleSelect(interaction) {
-        const menu = new ActionRowBuilder().addComponents(new RoleSelectMenuBuilder().setCustomId('tags_role_select').setPlaceholder('Selecione um cargo para configurar a tag...'));
+        const menu = new ActionRowBuilder().addComponents(new RoleSelectMenuBuilder().setCustomId('tags_role_select').setPlaceholder('Selecione um cargo para configurar...'));
         await interaction.reply({ components: [menu], ephemeral: true });
     },
 
@@ -36,7 +36,7 @@ const tagsHandler = {
             return { label: `[${t.tag}] - ${role ? role.name : 'Cargo Deletado'}`, value: t.role_id };
         }));
 
-        const menu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('tags_remove_select').setPlaceholder('Selecione a tag a ser removida...').addOptions(options));
+        const menu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('tags_remove_select').setPlaceholder('Selecione a tag a ser removida...').addOptions(options.filter(o => o.value)));
         await interaction.editReply({ components: [menu] });
     },
 
@@ -79,21 +79,25 @@ const tagsHandler = {
         await interaction.deferReply({ ephemeral: true });
         await interaction.editReply('🔄 **Sincronização iniciada...** Verificando todos os membros do servidor. Isso pode levar alguns instantes.');
         
-        let logMessage = '**Log de Sincronização:**\n';
+        let logMessage = '**Log de Sincronização em Tempo Real:**\n';
         let changesCount = 0;
 
         const members = await interaction.guild.members.fetch();
         
         for (const member of members.values()) {
-            const oldNickname = member.nickname;
+            const oldNickname = member.nickname || member.user.displayName;
             await updateMemberTag(member);
             // Recarrega o membro para pegar o nickname atualizado
-            await member.fetch();
-            const newNickname = member.nickname;
+            const updatedMember = await interaction.guild.members.fetch(member.id);
+            const newNickname = updatedMember.nickname || updatedMember.user.displayName;
 
             if (oldNickname !== newNickname) {
                 changesCount++;
                 logMessage += `✅ **${member.user.tag}** atualizado para \`${newNickname}\`\n`;
+                // Atualiza o log em tempo real para o admin
+                if (changesCount % 10 === 0) { // Atualiza a cada 10 alterações para não sobrecarregar a API
+                    await interaction.editReply(logMessage + '...');
+                }
             }
         }
         

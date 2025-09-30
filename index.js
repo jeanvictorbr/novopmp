@@ -2,9 +2,8 @@ const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require(
 const fs = require('node:fs');
 const path = require('node:path');
 require('dotenv-flow').config();
-const db = require('./database/db.js');
 
-// MONITORES E FUNÇÕES GLOBAIS
+// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
@@ -55,6 +54,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         let handler;
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
+
         for (const item of client.handlers.values()) {
             if (typeof item.customId === 'function' && item.customId(key)) {
                 handler = item;

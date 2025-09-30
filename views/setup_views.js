@@ -384,9 +384,8 @@ async function getTagsMenuPayload(db, guild) {
 
   if (tags.length > 0) {
     let tagList = '';
-    // Itera sobre os resultados para construir a lista de forma segura.
     for (const t of tags) {
-        // Busca o cargo no cache do servidor para exibir o nome.
+        // Usa o cache do servidor (guild) para encontrar o nome do cargo, que é mais rápido e confiável
         const role = guild.roles.cache.get(t.role_id);
         tagList += `\`[${t.tag}]\` - ${role ? role.name : 'Cargo não encontrado'}\n`;
     }
