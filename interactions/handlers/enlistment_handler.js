@@ -194,36 +194,49 @@ const enlistmentHandler = {
         }
         await db.run('INSERT INTO enlistment_quizzes (title, passing_score, questions) VALUES ($1, $2, $3)', [title, passingScore, '[]']);
         
-        const payload = await getQuizHubPayload(db);
-        await interaction.message.edit(payload); // Edita a mensagem original do Hub
-        await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso!` }); // Confirma para o admin
+        await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso! O painel será atualizado quando você voltar.` });
     },
 
     async handleAddQuestionModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const quizId = interaction.customId.split('_').pop();
+        
         try {
             const questionText = interaction.fields.getTextInputValue('question_text');
             const optionsText = interaction.fields.getTextInputValue('options');
             const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
             const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
 
-            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
-            const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
-            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
+            if (options.length < 2) {
+                return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
+            }
 
-            const newQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
-            const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-            const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
-            questions.push(newQuestion);
-            await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), quizId]);
+            const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
+            if (correctIndex < 0 || correctIndex >= options.length) {
+                return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida para as opções fornecidas.` });
+            }
             
-            const payload = await getQuizManagementPayload(db, quizId);
-            await interaction.message.edit(payload);
-            await interaction.editReply({ content: '✅ Pergunta adicionada com sucesso!' });
+            const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
+
+            if (!quiz) {
+                console.error(`[QUIZ DEBUG] CRITICAL: Prova com ID ${quizId} não foi encontrada no DB ao adicionar pergunta.`);
+                return await interaction.editReply({ content: '❌ Erro crítico: A prova para esta pergunta não foi encontrada.' });
+            }
+
+            const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+            const newQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
+            questions.push(newQuestion);
+            
+            await db.run(
+                'UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', 
+                [JSON.stringify(questions), quizId]
+            );
+
+            await interaction.editReply({ content: '✅ Pergunta adicionada com sucesso! O painel será atualizado da próxima vez que você o visualizar.' });
+
         } catch (error) {
-            console.error("Erro ao adicionar pergunta:", error);
-            await interaction.editReply({ content: '❌ Ocorreu um erro ao salvar a pergunta.' });
+            console.error("Erro CRÍTICO em handleAddQuestionModal:", error);
+            await interaction.editReply({ content: '❌ Ocorreu um erro inesperado ao salvar a pergunta. Verifique os logs do console.' }).catch(e => console.error("Falha ao enviar mensagem de erro:", e));
         }
     },
 
@@ -236,19 +249,30 @@ const enlistmentHandler = {
             const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
             const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
 
-            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
+            if (options.length < 2) {
+                return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
+            }
             const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
-            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
+            if (correctIndex < 0 || correctIndex >= options.length) {
+                return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
+            }
 
-            const updatedQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-            const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+            if (!quiz) {
+                 return await interaction.editReply({ content: '❌ Erro crítico: A prova para esta pergunta não foi encontrada.' });
+            }
+            
+            const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+            const updatedQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
+            
+            if(questionIndex >= questions.length){
+                 return await interaction.editReply({ content: '❌ Erro crítico: O índice da pergunta é inválido.' });
+            }
             questions[questionIndex] = updatedQuestion;
+            
             await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), quizId]);
             
-            const payload = await getQuizManagementPayload(db, quizId);
-            await interaction.message.edit(payload);
-            await interaction.editReply({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada!` });
+            await interaction.editReply({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada! O painel será atualizado da próxima vez que você o visualizar.` });
         } catch (error) {
             console.error("Erro ao editar pergunta:", error);
             await interaction.editReply({ content: '❌ Ocorreu um erro ao salvar as alterações.' });
