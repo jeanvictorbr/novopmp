@@ -502,10 +502,12 @@ const enlistmentHandler = {
         const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
         let dmEmbed;
         let finalNickname = null;
+        let actionHistoryText = '';
         if (newStatus === 'approved') {
             if (quizPassedRoleId) await candidate.roles.remove(quizPassedRoleId).catch(console.error);
             if (recruitRoleId) await candidate.roles.add(recruitRoleId).catch(console.error);
             dmEmbed = new EmbedBuilder().setColor('Green').setTitle('🎉 Alistamento Aprovado!').setDescription('Parabéns! Sua ficha foi aprovada e seu registro foi concluído.');
+            actionHistoryText = `✅ Aprovado por ${interaction.user.toString()}`;
             try {
                 const tagConfig = await db.get('SELECT tag FROM role_tags WHERE role_id = $1', [recruitRoleId]);
                 if (tagConfig && tagConfig.tag) {
@@ -522,6 +524,7 @@ const enlistmentHandler = {
         } else {
             if (quizPassedRoleId) await candidate.roles.remove(quizPassedRoleId).catch(console.error);
             dmEmbed = new EmbedBuilder().setColor('Red').setTitle('❌ Alistamento Recusado').setDescription('Sua ficha foi recusada. Agradecemos o interesse.');
+            actionHistoryText = `❌ Recusado por ${interaction.user.toString()}`;
         }
         try {
             await candidate.send({ embeds: [dmEmbed.setFooter({ text: `Analisado por: ${interaction.user.tag}` })] });
@@ -536,7 +539,8 @@ const enlistmentHandler = {
             .addFields(
                 { name: 'Candidato', value: candidate.toString(), inline: true },
                 { name: 'Nome (RP)', value: `\`${request.rp_name}\``, inline: true },
-                { name: 'ID (Jogo)', value: `\`${request.game_id}\``, inline: true }
+                { name: 'ID (Jogo)', value: `\`${request.game_id}\``, inline: true },
+                { name: 'Histórico de Ações', value: actionHistoryText }
             )
             .setImage(SETUP_EMBED_IMAGE_URL)
             .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
