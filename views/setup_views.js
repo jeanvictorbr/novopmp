@@ -34,10 +34,10 @@ async function getMainMenuPayload() {
         emoji: '⚖️',
       },
       {
-        label: 'Módulo Registros',
-        description: 'Gerencie a ficha de registro de cada oficial.',
-        value: 'module_records',
-        emoji: '📇',
+        label: 'Módulo Alistamento',
+        description: 'Gerencie o painel de alistamento e o canal de aprovações.',
+        value: 'module_enlistment',
+        emoji: '🗂️',
       },
       {
         label: 'Módulo Carreira',
@@ -411,27 +411,23 @@ async function getTagsMenuPayload(db, guild) {
 
   return { embeds: [embed], components: [buttons, syncButton] };
 }
-async function getRecordsMenuPayload(db) {
-  const settings = await db.get("SELECT value FROM settings WHERE key = 'records_public_channel_id'");
+async function getEnlistmentMenuPayload(db) {
+  const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'enlistment_%' OR key = 'recruiter_role_id'");
+  const settingsMap = new Map(settings.map(s => [s.key, s.value]));
   const embed = new EmbedBuilder()
-    .setColor('White')
-    .setTitle('📇 Configuração do Módulo de Registros')
-    .setDescription('Gerencie os registros de oficiais e configure a prova teórica de ingresso.')
-    .setImage(SETUP_EMBED_IMAGE_URL)
-    .addFields({ name: 'Canal Público de Consulta', value: settings ? `<#${settings.value}>` : '`Não definido`' })
-    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-  
-  const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('records_create_edit').setLabel('Criar / Editar Registro').setStyle(ButtonStyle.Success).setEmoji('📝'),
-    new ButtonBuilder().setCustomId('records_manage_test').setLabel('Gerenciar Prova Teórica').setStyle(ButtonStyle.Primary).setEmoji('❓').setDisabled(true) // Desabilitado por enquanto
+    .setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento')
+    .addFields(
+        { name: 'Canal do Painel Público', value: settingsMap.has('enlistment_public_channel_id') ? `<#${settingsMap.get('enlistment_public_channel_id')}>` : '`Não definido`' },
+        { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `<#${settingsMap.get('enlistment_approval_channel_id')}>` : '`Não definido`' },
+        { name: 'Cargo de Recrutador', value: settingsMap.has('recruiter_role_id') ? `<@&${settingsMap.get('recruiter_role_id')}>` : '`Não definido`' }
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('enlistment_set_public_channel').setLabel('Definir Canal Público').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_set_approval_channel').setLabel('Definir Canal Aprovação').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_set_recruiter_role').setLabel('Definir Cargo Recrutador').setStyle(ButtonStyle.Secondary)
   );
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('records_set_public_channel').setLabel('Definir Canal Público').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
-  );
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row, new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger))] };
 }
-
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
 module.exports = {
@@ -447,6 +443,7 @@ module.exports = {
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
   getTagsMenuPayload,
+  getEnlistmentMenuPayload,
   SETUP_FOOTER_TEXT,         // <-- CONSTANTE EXPORTADA
   SETUP_FOOTER_ICON_URL      // <-- CONSTANTE EXPORTADA
 };

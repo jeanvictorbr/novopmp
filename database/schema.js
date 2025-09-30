@@ -132,6 +132,21 @@ const schemaSQL = `
         role_id VARCHAR(255) PRIMARY KEY,
         tag TEXT NOT NULL
     );
+        CREATE TABLE IF NOT EXISTS role_tags (
+        role_id VARCHAR(255) PRIMARY KEY,
+        tag TEXT NOT NULL
+    );
+
+    -- Tabela do Módulo de Alistamento/Registros --
+    CREATE TABLE IF NOT EXISTS enlistment_requests (
+        request_id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        rp_name TEXT NOT NULL,
+        game_id TEXT,
+        recruiter_id VARCHAR(255),
+        status TEXT DEFAULT 'pending', -- pending, approved, rejected
+        request_date BIGINT
+    );
 `;
 
 // Esta função será chamada na inicialização do bot.
