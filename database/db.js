@@ -24,30 +24,29 @@ module.exports = {
    * @param {Array} params 
    */
   get: async (sql, params) => {
-    // Converte o placeholder '?' do SQLite para '$1, $2, ...' do PostgreSQL
-    const pgSql = sql.replace(/\?/g, (match, index, str) => `$${str.slice(0, index).split('?').length}`);
+    // --- INÍCIO DA CORREÇÃO ---
+    // Lógica de substituição que funciona para múltiplos placeholders
+    let i = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++i}`);
+    // --- FIM DA CORREÇÃO ---
     const res = await pool.query(pgSql, params);
     return res.rows[0];
   },
 
-  /**
-   * Função para buscar todas as linhas (compatível com o código antigo).
-   * @param {string} sql 
-   * @param {Array} params 
-   */
   all: async (sql, params) => {
-    const pgSql = sql.replace(/\?/g, (match, index, str) => `$${str.slice(0, index).split('?').length}`);
+    // --- INÍCIO DA CORREÇÃO ---
+    let i = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++i}`);
+    // --- FIM DA CORREÇÃO ---
     const res = await pool.query(pgSql, params);
     return res.rows;
   },
 
-  /**
-   * Função para executar um comando (INSERT, UPDATE, DELETE) (compatível com o código antigo).
-   * @param {string} sql 
-   * @param {Array} params 
-   */
   run: async (sql, params) => {
-    const pgSql = sql.replace(/\?/g, (match, index, str) => `$${str.slice(0, index).split('?').length}`);
+    // --- INÍCIO DA CORREÇÃO ---
+    let i = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++i}`);
+    // --- FIM DA CORREÇÃO ---
     return pool.query(pgSql, params);
   }
 };

@@ -417,15 +417,19 @@ async function getEnlistmentMenuPayload(db) {
     const activeQuizId = settingsMap.get('enlistment_quiz_id');
     let activeQuiz = null;
 
-    // --- INÍCIO DA CORREÇÃO ---
-    // Adicionamos uma validação para garantir que o ID é um número antes de consultar a base de dados.
-    if (activeQuizId && !isNaN(parseInt(activeQuizId, 10))) {
-        activeQuiz = await db.get('SELECT title FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
-    } else if (activeQuizId) {
-        // Se o ID não for um número válido, ele será ignorado, prevenindo o crash.
-        console.warn(`[CORREÇÃO AUTOMÁTICA] Um ID de prova inválido ('${activeQuizId}') foi encontrado e ignorado.`);
+    // --- INÍCIO DA CORREÇÃO DEFINITIVA ---
+    // Esta validação garante que apenas um ID de prova válido (um número pequeno)
+    // seja usado na consulta, ignorando IDs de Discord gigantes.
+    if (activeQuizId && /^\d{1,5}$/.test(activeQuizId)) { // Aceita apenas números com até 5 dígitos
+        try {
+            // Usamos $1, o placeholder correto para pg, para garantir consistência.
+            activeQuiz = await db.get('SELECT title FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
+        } catch (e) {
+            console.error("Erro ao buscar a prova ativa (ID: " + activeQuizId + "):", e);
+            activeQuiz = null; // Garante que não quebre se o ID não for encontrado
+        }
     }
-    // --- FIM DA CORREÇÃO ---
+    // --- FIM DA CORREÇÃO DEFINITIVA ---
 
     const embed = new EmbedBuilder().setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento').setDescription('Configure os canais e cargos para o processo de recrutamento. A prova teórica é opcional.').setImage(SETUP_EMBED_IMAGE_URL).setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .addFields(
