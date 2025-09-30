@@ -3,13 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 require('dotenv-flow').config();
 
-// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
+// IMPORTAÇÃO DOS MÓDulos PRINCIPAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
 const { dashboardMonitor } = require('./utils/dashboardMonitor.js');
 const { hierarchyMonitor } = require('./utils/hierarchyMonitor.js');
-const { updateMemberTag } = require('./utils/tagUpdater.js'); // <-- IMPORTAÇÃO DA FUNÇÃO DE TAGS
+const { updateMemberTag } = require('./utils/tagUpdater.js');
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -24,11 +24,12 @@ const client = new Client({
 });
 
 client.handlers = new Collection();
+client.functionHandlers = []; // Array para handlers com customId de função
 
 async function startBot() {
     await initializeDatabase();
+    loadHandlers('interactions'); // Carrega primeiro as interações para priorizar
     loadHandlers('commands');
-    loadHandlers('interactions');
     registerSlashCommands();
     client.login(DISCORD_TOKEN);
 }
@@ -43,25 +44,39 @@ function loadHandlers(dir) {
             loadHandlers(path.join(dir, file.name));
         } else if (file.name.endsWith('.js')) {
             const handler = require(filePath);
-            const key = handler.customId || handler.data?.name || file.name;
-            client.handlers.set(key, handler);
-            console.log(`[INFO] Handler Carregado: ${file.name}`);
+            
+            // Lógica de registro aprimorada
+            if (typeof handler.customId === 'function') {
+                client.functionHandlers.push(handler);
+                console.log(`[INFO] Handler de Função Carregado: ${file.name}`);
+            } else {
+                const key = handler.customId || handler.data?.name;
+                if (key) {
+                    client.handlers.set(key, handler);
+                    console.log(`[INFO] Handler Padrão Carregado: ${file.name} (key: ${key})`);
+                }
+            }
         }
     }
 }
 
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
-        let handler;
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
+        let handler;
 
-        for (const item of client.handlers.values()) {
-            if (typeof item.customId === 'function' && item.customId(key)) {
-                handler = item;
-                break;
+        // 1. Procura primeiro por uma correspondência exata de ID (mais rápido)
+        handler = client.handlers.get(key);
+
+        // 2. Se não encontrar, procura nos handlers de função
+        if (!handler) {
+            for (const funcHandler of client.functionHandlers) {
+                if (funcHandler.customId(key)) {
+                    handler = funcHandler;
+                    break;
+                }
             }
         }
-        if (!handler) handler = client.handlers.get(key);
 
         if (!handler) {
             return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
@@ -69,18 +84,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
+        const replyPayload = { content: '❌ Houve um erro crítico!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: '❌ Houve um erro crítico!', ephemeral: true }).catch(() => {});
+            await interaction.followUp(replyPayload).catch(() => {});
         } else {
-            await interaction.reply({ content: '❌ Houve um erro crítico!', ephemeral: true }).catch(() => {});
+            await interaction.reply(replyPayload).catch(() => {});
         }
     }
 });
 
-// --- NOVO EVENTO PARA ATUALIZAÇÃO DE TAGS EM TEMPO REAL ---
-// Este evento é acionado sempre que um membro é atualizado (ex: recebe um novo cargo).
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
-    // Compara os cargos antigos com os novos. Se forem diferentes, chama a função.
     if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
         console.log(`[TAGS] Detectada mudança de cargos para ${newMember.user.tag}. Verificando tag...`);
         updateMemberTag(newMember);

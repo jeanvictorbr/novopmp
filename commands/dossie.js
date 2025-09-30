@@ -6,15 +6,15 @@ async function generateDossieEmbed(targetUser, guild) {
     const now = Math.floor(Date.now() / 1000);
 
     // --- DADOS GERAIS DE PATRULHA ---
-    const history = await db.all('SELECT SUM(duration_seconds) AS total_seconds FROM patrol_history WHERE user_id = $1', [userId]);
+    const history = await db.get('SELECT SUM(duration_seconds) AS total_seconds FROM patrol_history WHERE user_id = $1', [userId]);
     const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
     const activeSeconds = activeSession ? now - activeSession.start_time : 0;
-    const totalSeconds = (history[0]?.total_seconds || 0) + activeSeconds;
+    const totalSeconds = (history?.total_seconds || 0) + activeSeconds;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
 
-    // --- DADOS DE RECRUTAMENTO (NOVO) ---
+    // --- DADOS DE RECRUTAMENTO (CORRIGIDO) ---
     const recruitmentData = await db.get("SELECT COUNT(*) as count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
     const totalRecruits = recruitmentData?.count || 0;
 
