@@ -1,3 +1,5 @@
+// Local: database/schema.js
+
 const db = require('./db.js');
 
 // Este é o "mapa" completo de todas as tabelas que o Phoenix precisa para funcionar.
@@ -123,29 +125,37 @@ const schemaSQL = `
     CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
         role_id VARCHAR(255) PRIMARY KEY
     );
-    CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
-        role_id VARCHAR(255) PRIMARY KEY
-    );
-    
-    -- Tabela do Módulo Tags Policiais --
     CREATE TABLE IF NOT EXISTS role_tags (
         role_id VARCHAR(255) PRIMARY KEY,
         tag TEXT NOT NULL
     );
-        CREATE TABLE IF NOT EXISTS role_tags (
-        role_id VARCHAR(255) PRIMARY KEY,
-        tag TEXT NOT NULL
-    );
 
-    -- Tabela do Módulo de Alistamento/Registros --
+    -- NOVAS TABELAS PARA O MÓDULO DE ALISTAMENTO --
     CREATE TABLE IF NOT EXISTS enlistment_requests (
         request_id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL,
+        user_id VARCHAR(255) NOT NULL UNIQUE, -- Garante que um usuário só pode ter uma ficha ativa
         rp_name TEXT NOT NULL,
         game_id TEXT,
         recruiter_id VARCHAR(255),
-        status TEXT DEFAULT 'pending', -- pending, approved, rejected
-        request_date BIGINT
+        status TEXT DEFAULT 'pending', -- pending, approved, rejected, quiz_pending
+        request_date BIGINT,
+        log_message_id VARCHAR(255)
+    );
+
+    CREATE TABLE IF NOT EXISTS enlistment_quizzes (
+        quiz_id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        questions JSONB NOT NULL, -- Armazenará as perguntas e alternativas como um objeto JSON
+        passing_score INTEGER DEFAULT 70 -- Pontuação mínima para passar (em %)
+    );
+
+    CREATE TABLE IF NOT EXISTS enlistment_attempts (
+        attempt_id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        quiz_id INTEGER REFERENCES enlistment_quizzes(quiz_id) ON DELETE CASCADE,
+        score INTEGER NOT NULL,
+        passed BOOLEAN NOT NULL,
+        attempt_date BIGINT
     );
 `;
 
@@ -157,7 +167,6 @@ async function initializeDatabase() {
         console.log('[DATABASE] Esquema verificado e sincronizado com sucesso.');
     } catch (error) {
         console.error('[DATABASE] Erro crítico ao inicializar o banco de dados:', error);
-        // Em um ambiente de produção, você pode querer que o bot pare se o DB falhar.
         process.exit(1); 
     }
 }
