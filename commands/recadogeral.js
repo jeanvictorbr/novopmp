@@ -4,7 +4,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('recadogeral')
         .setDescription('Envia uma mensagem privada para todos os membros do servidor.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Apenas administradores podem usar
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     
     async execute(interaction) {
         const modal = new ModalBuilder()
@@ -14,8 +14,9 @@ module.exports = {
         const messageInput = new TextInputBuilder()
             .setCustomId('recado_geral_input')
             .setLabel("Mensagem a ser enviada")
-            .setStyle(TextInputStyle.Paragraph) // Campo de texto longo
-            .setPlaceholder('Escreva aqui o comunicado que será enviado para todos os membros. Você pode usar markdown como **negrito**.')
+            .setStyle(TextInputStyle.Paragraph)
+            // CORREÇÃO: Texto do placeholder encurtado para ficar dentro do limite de 100 caracteres.
+            .setPlaceholder('Escreva aqui o comunicado para todos os membros. Markdown como **negrito** é permitido.')
             .setRequired(true);
 
         const row = new ActionRowBuilder().addComponents(messageInput);
