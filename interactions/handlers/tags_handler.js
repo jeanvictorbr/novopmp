@@ -38,12 +38,7 @@ const tagsHandler = {
             return { label: `[${t.tag}] - ${role ? role.name : 'Cargo Deletado'}`, value: t.role_id };
         }));
 
-        const menu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId('tags_remove_select')
-                .setPlaceholder('Selecione a configuração de tag a ser removida...')
-                .addOptions(options.filter(o => o.value)) // Filtra entradas nulas
-        );
+        const menu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('tags_remove_select').setPlaceholder('Selecione a tag a ser removida...').addOptions(options.filter(o => o.value)));
         await interaction.editReply({ components: [menu] });
     },
 
@@ -60,37 +55,29 @@ const tagsHandler = {
     },
 
     async handleSetTag(interaction) {
-        await interaction.deferUpdate(); // Defer a interação do modal. Isso reconhece a interação sem enviar uma nova mensagem.
+        // CORREÇÃO: Responde à interação do modal de forma efêmera.
+        await interaction.deferReply({ ephemeral: true });
         const roleId = interaction.customId.split('_').pop();
         const tag = interaction.fields.getTextInputValue('tag_input').trim();
 
         await db.run('INSERT INTO role_tags (role_id, tag) VALUES ($1, $2) ON CONFLICT (role_id) DO UPDATE SET tag = $2', [roleId, tag]);
         
-        // CORREÇÃO: A interação do formulário não pode editar a mensagem original diretamente.
-        // O painel será atualizado na próxima vez que for aberto. Enviamos uma confirmação.
-        // No entanto, como o usuário quer atualização em tempo real, a melhor abordagem é
-        // recarregar o payload e editar a mensagem original da interação QUE ABRIU O MODAL.
-        // Mas a interação do modal não tem essa referência. A solução mais limpa é esta:
-        const payload = await getTagsMenuPayload(db, interaction.guild);
-        // O `interaction.message` aqui se refere à mensagem onde o botão original foi clicado.
-        // Para a interação do modal, a mensagem original é a do comando /setup.
-        // Se a interação original foi um select menu, `interaction.message` está disponível.
-        await interaction.message.edit(payload);
+        // Apenas confirma o sucesso, não tenta editar o painel anterior.
+        await interaction.editReply({ content: '✅ Tag configurada com sucesso! O painel será atualizado quando você voltar a ele.'});
     },
 
     async handleRemoveTag(interaction) {
-        await interaction.deferUpdate();
+        // CORREÇÃO: Responde à interação do menu de forma efêmera.
+        await interaction.deferReply({ ephemeral: true });
         const roleId = interaction.values[0];
         await db.run('DELETE FROM role_tags WHERE role_id = $1', [roleId]);
-
-        // CORREÇÃO: Mesma lógica acima. Atualiza o painel original.
-        const payload = await getTagsMenuPayload(db, interaction.guild);
-        await interaction.message.edit(payload);
+        
+        await interaction.editReply({ content: '✅ Tag removida com sucesso! O painel será atualizado quando você voltar a ele.', components: []});
     },
 
     async syncAllTags(interaction) {
         await interaction.deferReply({ ephemeral: true });
-        await interaction.editReply('🔄 **Sincronização iniciada...** Verificando todos os membros. Isso pode levar alguns instantes.');
+        await interaction.editReply('🔄 **Sincronização iniciada...** Verificando todos os membros do servidor. Isso pode levar alguns instantes.');
         
         let logMessage = '**Log de Sincronização:**\n';
         let changesCount = 0;
@@ -100,7 +87,7 @@ const tagsHandler = {
         for (const member of members.values()) {
             const oldNickname = member.nickname || member.user.displayName;
             await updateMemberTag(member);
-            const updatedMember = await member.fetch(true); // Força a busca de dados atualizados
+            const updatedMember = await member.fetch(true);
             const newNickname = updatedMember.nickname || updatedMember.user.displayName;
 
             if (oldNickname !== newNickname) {
@@ -110,7 +97,6 @@ const tagsHandler = {
         }
         
         logMessage += `\n**Sincronização concluída!** ${changesCount} nicknames foram atualizados.`;
-
         await interaction.editReply({ content: logMessage });
     }
 };
