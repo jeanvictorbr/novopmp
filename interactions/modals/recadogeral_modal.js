@@ -16,7 +16,7 @@ module.exports = {
         .setColor('Blue')
         .setAuthor({ name: guild.name, iconURL: guild.iconURL() })
         .setTitle('📢 Comunicado Oficial')
-        .setDescription(messageContent)
+        .setDescription(`\`\`\`${messageContent}\`\`\``)
         .setTimestamp()
         .setFooter({ text: footerText, iconURL: footerIconURL });
 
