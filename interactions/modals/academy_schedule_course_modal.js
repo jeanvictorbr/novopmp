@@ -1,21 +1,19 @@
-const db = require('../../database/db.js');
-const { updateAcademyPanel } = require('../../utils/updateAcademyPanel.js');
+const db = require('../../../database/db.js');
+const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
 
 module.exports = {
-  customId: 'academy_schedule_course_modal',
+  customId: (id) => id.startsWith('academy_schedule_course_modal'),
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const courseId = interaction.fields.getTextInputValue('course_id').toUpperCase();
+    const [, courseId] = interaction.customId.split('|');
     const title = interaction.fields.getTextInputValue('event_title');
     const dateString = interaction.fields.getTextInputValue('event_date');
     const timeString = interaction.fields.getTextInputValue('event_time');
 
     try {
       const course = await db.get('SELECT * FROM academy_courses WHERE course_id = $1', [courseId]);
-      if (!course) {
-        return await interaction.editReply('❌ O ID do curso fornecido não foi encontrado.');
-      }
+      if (!course) return await interaction.editReply('❌ O ID do curso fornecido não foi encontrado.');
       
       const [day, month, year] = dateString.split('/').map(Number);
       const [hour, minute] = timeString.split(':').map(Number);

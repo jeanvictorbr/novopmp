@@ -28,16 +28,13 @@ module.exports = {
                     return await interaction.editReply('❌ O canal da Academia configurado não foi encontrado.');
                 }
 
-                // Envia uma mensagem temporária que será substituída pelo painel real
                 const panelMessage = await targetChannel.send({ content: 'Carregando painel da academia...' });
                 
                 await db.run('INSERT INTO panels (panel_type, channel_id, message_id) VALUES ($1, $2, $3) ON CONFLICT (panel_type) DO UPDATE SET channel_id = $2, message_id = $3',
                     ['academy', panelMessage.channel.id, panelMessage.id]
                 );
 
-                // Chama a função que constrói e atualiza o painel
                 await updateAcademyPanel(interaction.client);
-
                 await interaction.editReply(`✅ Painel da Academia implantado com sucesso no canal ${targetChannel}.`);
 
             } catch (error) {

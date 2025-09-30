@@ -1,4 +1,4 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, ComponentType } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const db = require('../../../database/db.js');
 
 module.exports = {
@@ -6,7 +6,7 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
         
-        const courses = await db.all('SELECT course_id, name, description, required_hours FROM academy_courses ORDER BY name ASC');
+        const courses = await db.all('SELECT course_id, name, description FROM academy_courses ORDER BY name ASC');
         if (courses.length === 0) {
             return await interaction.editReply('Nenhum curso disponível no catálogo no momento.');
         }
@@ -25,7 +25,7 @@ module.exports = {
         );
 
         await interaction.editReply({
-            content: 'Selecione um curso do catálogo abaixo para entrar na lista de espera. Você será notificado quando uma turma for agendada.',
+            content: 'Selecione um curso do catálogo para entrar na lista de espera. Você será notificado quando uma turma for agendada.',
             components: [selectMenu]
         });
     }
