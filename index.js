@@ -3,13 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 require('dotenv-flow').config();
 
-// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
 const { dashboardMonitor } = require('./utils/dashboardMonitor.js');
 const { hierarchyMonitor } = require('./utils/hierarchyMonitor.js');
 const { updateMemberTag } = require('./utils/tagUpdater.js');
+const { updateAcademyPanel } = require('./utils/updateAcademyPanel.js'); // NOVA IMPORTAÇÃO
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -23,7 +23,6 @@ const client = new Client({
     ],
 });
 
-// Sistema de Handlers Unificado
 client.handlers = new Collection();
 
 async function startBot() {
@@ -44,7 +43,6 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
-                // A chave é o nome do comando (para /) ou uma função de verificação (para componentes)
                 const key = handler.data?.name || handler.customId;
                 if (key) {
                     client.handlers.set(key, handler);
@@ -61,28 +59,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
         let handler = null;
-
-        // Lógica de Roteamento Robusta
         for (const [handlerKey, handlerValue] of client.handlers.entries()) {
-            // Se a chave for uma função (para customIds dinâmicos ou que usam .startsWith)
             if (typeof handlerKey === 'function' && handlerKey(key)) {
                 handler = handlerValue;
                 break;
             }
-            // Se a chave for uma string (para comandos / e customIds exatos)
             if (typeof handlerKey === 'string' && handlerKey === key) {
                 handler = handlerValue;
                 break;
             }
         }
-
+        if (!handler) {
+             // Lógica especial para botões com payload dinâmico
+            const keyParts = key.split('|');
+            const baseKey = keyParts[0];
+            handler = client.handlers.get(hKey => typeof hKey === 'function' && hKey(baseKey));
+            if (typeof handler?.customId === 'function' && handler.customId(key)) {
+                 // Confirmação final
+            } else {
+                 handler = client.handlers.get(baseKey);
+            }
+        }
         if (!handler) {
             return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
         }
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
-        const replyPayload = { content: '❌ Houve um erro crítico ao processar esta ação!', ephemeral: true };
+        const replyPayload = { content: '❌ Houve um erro crítico!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp(replyPayload).catch(() => {});
         } else {
@@ -103,6 +107,7 @@ client.once(Events.ClientReady, readyClient => {
     setInterval(() => patrolMonitor(readyClient), 30000);
     setInterval(() => dashboardMonitor(readyClient), 5000); 
     setInterval(() => hierarchyMonitor(readyClient), 180000);
+    setInterval(() => updateAcademyPanel(readyClient), 60000); // NOVO MONITOR
     console.log('[INFO] Todos os monitores foram ativados.');
     console.log(`\n---\nLogado como ${readyClient.user.tag}\n---`);
 });
