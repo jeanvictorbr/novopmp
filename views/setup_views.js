@@ -230,6 +230,57 @@ async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
   return { embeds: [embed], components: [actionRow, buttonRow] };
 }
 
+async function getQuizHubPayload(db) {
+    const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes ORDER BY title ASC");
+    const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
+
+    const embed = new EmbedBuilder()
+        .setColor("Navy")
+        .setTitle("✍️ Hub de Gestão de Provas")
+        .setDescription("Crie, ative ou gira as provas teóricas do seu processo de alistamento. A prova ativa será a exigida para os novos candidatos.")
+        .setImage(SETUP_EMBED_IMAGE_URL)
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+
+    const components = [];
+
+    // Menu de Seleção para Ativar ou Gerir Provas
+    if (quizzes.length > 0) {
+        const options = quizzes.map(q => ({
+            label: q.title,
+            value: `quiz_admin_select_${q.quiz_id}`,
+            description: `ID da Prova: ${q.quiz_id}`,
+            emoji: q.quiz_id.toString() === activeQuizId ? '✅' : '⚫'
+        }));
+
+        // Adiciona a opção para desativar a prova
+        options.push({
+            label: 'Desativar Prova Teórica',
+            value: 'quiz_admin_deactivate',
+            description: 'Define o modo de alistamento como "Direto", sem prova.',
+            emoji: '❌'
+        });
+
+        const selectMenu = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('quiz_admin_select_action')
+                .setPlaceholder("Selecione uma prova para ativar ou gerir...")
+                .addOptions(options)
+        );
+        components.push(selectMenu);
+    } else {
+        embed.addFields({ name: "Nenhuma Prova Criada", value: "Utilize o botão abaixo para criar a sua primeira prova teórica." });
+    }
+
+    // Botões de Ação
+    const actionButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('quiz_admin_create_new').setLabel("Criar Nova Prova").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('quiz_admin_back_to_enlistment_menu').setLabel("Voltar").setStyle(ButtonStyle.Secondary)
+    );
+    components.push(actionButtons);
+
+    return { embeds: [embed], components };
+}
+
 async function getCorregedoriaMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'corregedoria_%'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
@@ -456,6 +507,54 @@ async function getEnlistmentMenuPayload(db) {
     return { embeds: [embed], components: [row1, row2, row3] };
 }
 
+async function getQuizManagementPayload(db, quizId) {
+    const quiz = await db.get('SELECT * FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
+    if (!quiz) {
+        // Retorna um payload de erro se a prova for apagada enquanto alguém a visualiza
+        return {
+            embeds: [new EmbedBuilder().setColor("Red").setTitle("Erro").setDescription("Esta prova não foi encontrada. Pode ter sido apagada.")],
+            components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel("Voltar ao Hub de Provas").setStyle(ButtonStyle.Primary))]
+        };
+    }
+
+    const questions = JSON.parse(quiz.questions);
+    const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
+    const isActive = quiz.quiz_id.toString() === activeQuizId;
+
+    const embed = new EmbedBuilder()
+        .setColor(isActive ? "Green" : "Blue")
+        .setTitle(`🛠️ Gerindo a Prova: ${quiz.title}`)
+        .setDescription(`**ID da Prova:** \`${quiz.quiz_id}\` | **Nota Mínima:** \`${quiz.passing_score}%\` | **Status:** ${isActive ? '✅ Ativa' : '⚫ Inativa'}`)
+        .setFooter({ text: "Use os botões abaixo para gerir as perguntas desta prova." });
+
+    if (questions.length > 0) {
+        let questionsText = '';
+        questions.forEach((q, index) => {
+            questionsText += `**${index + 1}. ${q.question}**\n`;
+            questionsText += `*Resposta Correta: ${q.correct}*\n\n`;
+        });
+        embed.addFields({ name: 'Perguntas Atuais', value: questionsText });
+    } else {
+        embed.addFields({ name: 'Nenhuma Pergunta Adicionada', value: 'Use o botão "Adicionar Pergunta" para começar a montar a prova.' });
+    }
+
+    const components = [];
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`quiz_admin_add_question_${quiz.quiz_id}`).setLabel("Adicionar Pergunta").setStyle(ButtonStyle.Success).setEmoji('➕'),
+        new ButtonBuilder().setCustomId(`quiz_admin_edit_question_${quiz.quiz_id}`).setLabel("Editar/Apagar Pergunta").setStyle(ButtonStyle.Secondary).setEmoji('✏️').setDisabled(questions.length === 0),
+    );
+    components.push(row1);
+
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`quiz_admin_activate_${quiz.quiz_id}`).setLabel("Ativar Prova").setStyle(ButtonStyle.Primary).setEmoji('✅').setDisabled(isActive),
+        new ButtonBuilder().setCustomId(`quiz_admin_delete_quiz_${quiz.quiz_id}`).setLabel("Apagar Prova").setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+        new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel("Voltar ao Hub").setStyle(ButtonStyle.Secondary),
+    );
+    components.push(row2);
+    
+    return { embeds: [embed], components };
+}
+
 
 
 
@@ -473,5 +572,7 @@ module.exports = {
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
   getTagsMenuPayload,
-  getEnlistmentMenuPayload // <-- ADICIONADO AQUI
+  getEnlistmentMenuPayload,
+  getQuizHubPayload,
+  getQuizManagementPayload  // <-- ADICIONADO AQUI
 };
