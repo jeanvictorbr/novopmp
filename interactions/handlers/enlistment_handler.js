@@ -1,5 +1,7 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const db = require('../../database/db.js');
+
+// A importação agora vai funcionar corretamente
 const { getEnlistmentMenuPayload, getQuizHubPayload, getQuizManagementPayload, SETUP_EMBED_IMAGE_URL, SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../views/setup_views.js');
 
 // Mapa para armazenar o estado das provas dos usuários em andamento.
@@ -78,7 +80,7 @@ const enlistmentHandler = {
     },
 
     //==================================
-    // LÓGICA DE CONFIGURAÇÃO (ADMIN) - SEM ALTERAÇÕES
+    // LÓGICA DE CONFIGURAÇÃO (ADMIN)
     //==================================
     async handleSetup(interaction) {
         const action = interaction.customId.split('_').slice(2).join('_');
@@ -210,7 +212,7 @@ const enlistmentHandler = {
     },
 
     //==================================
-    // LÓGICA DOS FORMULÁRIOS (MODALS) - SEM ALTERAÇÕES
+    // LÓGICA DOS FORMULÁRIOS (MODALS)
     //==================================
     async handleCreateQuizModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
@@ -275,7 +277,7 @@ const enlistmentHandler = {
     },
     
     //==================================
-    // LÓGICA PÚBLICA (CANDIDATO) - SEM ALTERAÇÕES
+    // LÓGICA PÚBLICA (CANDIDATO)
     //==================================
     async handleStartProcess(interaction) {
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
@@ -403,23 +405,28 @@ const enlistmentHandler = {
         if (!quizState) return;
         const [, , , , chosenLetter] = interaction.customId.split('_');
         const questionData = quizState.questions[quizState.currentQuestionIndex];
-        const newRow = new ActionRowBuilder();
-        interaction.message.components[0].components.forEach(buttonData => {
-            const buttonJson = buttonData.toJSON(); // Usar toJSON() para obter uma cópia limpa dos dados
-            const newButton = new ButtonBuilder(buttonJson).setDisabled(true);
-            newRow.addComponents(newButton);
+        
+        const newRow = ActionRowBuilder.from(interaction.message.components[0]);
+        newRow.components.forEach((button, index) => {
+            const buttonBuilder = ButtonBuilder.from(button).setDisabled(true);
+            const letter = String.fromCharCode(65 + index);
+
+            if (letter === chosenLetter) {
+                if (chosenLetter === questionData.correct) {
+                    quizState.score++;
+                    buttonBuilder.setStyle(ButtonStyle.Success);
+                } else {
+                    buttonBuilder.setStyle(ButtonStyle.Danger);
+                }
+            } else if (letter === questionData.correct) {
+                buttonBuilder.setStyle(ButtonStyle.Success);
+            }
+            newRow.components[index] = buttonBuilder;
         });
-        const chosenButton = newRow.components.find(c => c.data.label === chosenLetter);
-        if (chosenLetter === questionData.correct) {
-            quizState.score++;
-            if (chosenButton) chosenButton.setStyle(ButtonStyle.Success);
-        } else {
-            if (chosenButton) chosenButton.setStyle(ButtonStyle.Danger);
-            const correctButton = newRow.components.find(c => c.data.label === questionData.correct);
-            if (correctButton) correctButton.setStyle(ButtonStyle.Success);
-        }
+
         await interaction.editReply({ components: [newRow] });
         quizState.currentQuestionIndex++;
+        
         setTimeout(async () => {
             if (quizState.currentQuestionIndex < quizState.questions.length) {
                 await this.sendQuestion(interaction, quizState);
@@ -472,7 +479,7 @@ const enlistmentHandler = {
     },
 
     //==================================
-    // LÓGICA DO RECRUTADOR - SEM ALTERAÇÕES
+    // LÓGICA DO RECRUTADOR
     //==================================
     async handleApproval(interaction) {
         await interaction.deferUpdate();

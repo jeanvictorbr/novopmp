@@ -1,8 +1,11 @@
 const { EmbedBuilder, StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, RoleSelectMenuBuilder } = require('discord.js');
 const db = require('../database/db.js');
+
+// VARIÁVEIS GLOBAIS DE ESTILO
 const SETUP_EMBED_IMAGE_URL = 'https://i.imgur.com/O9Efa95.gif';
-const SETUP_FOOTER_TEXT = 'PoliceFlow• Sistema de Gestão Policial 🥇';      // Texto do rodapé
+const SETUP_FOOTER_TEXT = 'PoliceFlow• Sistema de Gestão Policial 🥇';
 const SETUP_FOOTER_ICON_URL = 'https://media.tenor.com/UHQFxxKqRGgAAAAi/police-bttv.gif';
+
 
 async function getMainMenuPayload() {
   const embed = new EmbedBuilder()
@@ -122,10 +125,8 @@ async function getCopomTeamsMenuPayload(db) {
 
 async function getAcademyMenuPayload(db) {
     const courses = await db.all('SELECT * FROM academy_courses');
-    
     const settings = await db.all("SELECT key, value FROM settings WHERE key IN ('academy_channel_id', 'academy_discussion_channel_id', 'academy_logs_channel_id')");
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
-    
     const embed = new EmbedBuilder()
         .setColor(0xFEEA0A)
         .setTitle('🎓 Configuração do Módulo Academia')
@@ -137,14 +138,12 @@ async function getAcademyMenuPayload(db) {
             { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false }
         )
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-    
     if (courses.length > 0) {
         const coursesList = courses.map(c => `**${c.name}**\n\`ID: ${c.course_id}\` - Horas Mínimas: \`${c.required_hours}\``).join('\n\n');
         embed.addFields({ name: 'Cursos Atuais', value: coursesList });
     } else {
         embed.addFields({ name: 'Cursos Atuais', value: '`Nenhum curso configurado.`' });
     }
-    
     const actionButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_add_course').setLabel('Adicionar Curso').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('academy_edit_course').setLabel('Editar Curso').setStyle(ButtonStyle.Secondary).setDisabled(courses.length === 0),
@@ -156,16 +155,13 @@ async function getAcademyMenuPayload(db) {
     const scheduleButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('academy_schedule_course').setLabel('Agendar Curso').setStyle(ButtonStyle.Primary).setEmoji('🗓️').setDisabled(courses.length === 0)
     );
-    
     const configButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal de Estudos').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
-
     const components = [actionButtons, certifyButton, scheduleButton, configButtons];
-    
     if (courses.length > 0) {
         const options = courses.map(c => ({
             label: c.name,
@@ -180,7 +176,6 @@ async function getAcademyMenuPayload(db) {
         );
         components.splice(1, 0, selectMenu);
     }
-    
     return { embeds: [embed], components: components };
 }
 
@@ -233,17 +228,13 @@ async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
 async function getQuizHubPayload(db) {
     const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes ORDER BY title ASC");
     const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
-
     const embed = new EmbedBuilder()
         .setColor("Navy")
         .setTitle("✍️ Hub de Gestão de Provas")
         .setDescription("Crie, ative ou gira as provas teóricas do seu processo de alistamento. A prova ativa será a exigida para os novos candidatos.")
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-
     const components = [];
-
-    // Menu de Seleção para Ativar ou Gerir Provas
     if (quizzes.length > 0) {
         const options = quizzes.map(q => ({
             label: q.title,
@@ -251,15 +242,12 @@ async function getQuizHubPayload(db) {
             description: `ID da Prova: ${q.quiz_id}`,
             emoji: q.quiz_id.toString() === activeQuizId ? '✅' : '⚫'
         }));
-
-        // Adiciona a opção para desativar a prova
         options.push({
             label: 'Desativar Prova Teórica',
             value: 'quiz_admin_deactivate',
             description: 'Define o modo de alistamento como "Direto", sem prova.',
             emoji: '❌'
         });
-
         const selectMenu = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId('quiz_admin_select_action')
@@ -270,21 +258,17 @@ async function getQuizHubPayload(db) {
     } else {
         embed.addFields({ name: "Nenhuma Prova Criada", value: "Utilize o botão abaixo para criar a sua primeira prova teórica." });
     }
-
-    // Botões de Ação
     const actionButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('quiz_admin_create_new').setLabel("Criar Nova Prova").setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('quiz_admin_back_to_enlistment_menu').setLabel("Voltar").setStyle(ButtonStyle.Secondary)
     );
     components.push(actionButtons);
-
     return { embeds: [embed], components };
 }
 
 async function getCorregedoriaMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'corregedoria_%'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
-
   const formatSetting = (key, type) => {
     if (settingsMap.has(key)) {
       const id = settingsMap.get(key);
@@ -292,7 +276,6 @@ async function getCorregedoriaMenuPayload(db) {
     }
     return '❌ `Não definido`';
   };
-
   const embed = new EmbedBuilder()
     .setColor('DarkRed')
     .setTitle('⚖️ Configuração do Módulo Corregedoria')
@@ -306,54 +289,45 @@ async function getCorregedoriaMenuPayload(db) {
         { name: '📄 Canal de Transcripts', value: `Onde os arquivos de texto das conversas são salvos.\n**Status:** ${formatSetting('corregedoria_transcript_channel_id', 'channel')}` }
     )
     .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-    
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup_corregedoria_set_role').setLabel('Definir Cargo').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('setup_corregedoria_set_category').setLabel('Definir Categoria').setStyle(ButtonStyle.Secondary)
   );
-  
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup_corregedoria_set_public').setLabel('Definir Canal de Abertura').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('setup_corregedoria_set_logs').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary)
   );
-  
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup_corregedoria_set_transcript').setLabel('Definir Canal de Transcripts').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('setup_corregedoria_manage_punishments').setLabel('Gerenciar Punições').setStyle(ButtonStyle.Primary).setEmoji('📜')
   );
-
   const row4 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('corregedoria_direct_sanction').setLabel('Aplicar Sanção Direta').setStyle(ButtonStyle.Primary).setEmoji('⚖️'),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar ao Início').setStyle(ButtonStyle.Danger)
   );
-
   return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
 
 async function getCorregedoriaPunishmentsMenuPayload(db) {
     const punishments = await db.all('SELECT * FROM corregedoria_punishments ORDER BY name ASC');
-    
     const embed = new EmbedBuilder()
         .setColor('DarkRed')
         .setTitle('📜 Gerenciamento de Punições Pré-definidas')
         .setDescription('Adicione, remova ou edite as sanções que podem ser aplicadas nos tickets. Estas opções aparecerão no menu de seleção ao aplicar uma punição.')
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-    
     if (punishments.length > 0) {
         const punishmentList = punishments.map(p => `**- ${p.name}:** *${p.description}*`).join('\n');
         embed.addFields({ name: 'Punições Atuais', value: punishmentList });
     } else {
         embed.addFields({ name: 'Punições Atuais', value: '`Nenhuma punição pré-definida foi adicionada ainda.`' });
     }
-
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('corregedoria_add_punishment').setLabel('Adicionar Punição').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('corregedoria_edit_punishment').setLabel('Editar Punição').setStyle(ButtonStyle.Primary).setDisabled(punishments.length === 0),
         new ButtonBuilder().setCustomId('corregedoria_remove_punishment').setLabel('Remover Punição').setStyle(ButtonStyle.Danger).setDisabled(punishments.length === 0),
         new ButtonBuilder().setCustomId('back_to_corregedoria_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
-
     return { embeds: [embed], components: [buttons] };
 }
 
@@ -366,7 +340,6 @@ async function getDecorationsMenuPayload(db) {
     .setImage(SETUP_EMBED_IMAGE_URL)
     .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
     .addFields({ name: 'Canal de Anúncios', value: settings ? `<#${settings.value}>` : '`Não definido`' });
-  
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('decorations_promote_officer').setLabel('Promover Oficial').setStyle(ButtonStyle.Success).setEmoji('⬆️'),
     new ButtonBuilder().setCustomId('decorations_award_medal').setLabel('Condecorar Oficial').setStyle(ButtonStyle.Primary).setEmoji('🎖️'),
@@ -388,7 +361,6 @@ async function getDecorationsManageMedalsPayload(db) {
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .setDescription('`Crie ou remova as medalhas que podem ser concedidas aos oficiais.`');
-
     if (medals.length > 0) {
         const medalList = medals.map(m => `${m.emoji || '🎖️'} **${m.name}**: *${m.description}*`).join('\n');
         embed.addFields({ name: 'Medalhas Existentes', value: medalList });
@@ -402,6 +374,7 @@ async function getDecorationsManageMedalsPayload(db) {
     );
     return { embeds: [embed], components: [buttons] };
 }
+
 async function getHierarchyMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'hierarchy_%'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
@@ -438,7 +411,6 @@ async function getTagsMenuPayload(db, guild) {
     .setDescription('Configure as tags que serão aplicadas automaticamente aos nicknames dos membros com base em seus cargos. O bot sempre aplicará a tag do cargo mais alto.')
     .setImage(SETUP_EMBED_IMAGE_URL)
     .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-
   if (tags.length > 0) {
     let tagList = '';
     for (const t of tags) {
@@ -449,39 +421,30 @@ async function getTagsMenuPayload(db, guild) {
   } else {
     embed.addFields({ name: 'Tags Configuradas', value: '`Nenhuma tag configurada ainda.`' });
   }
-  
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('tags_add_edit').setLabel('Adicionar / Editar').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('tags_remove').setLabel('Remover').setStyle(ButtonStyle.Danger).setDisabled(tags.length === 0),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
-  
   const syncButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('tags_sync_all').setLabel('Sincronizar Todos').setStyle(ButtonStyle.Primary).setEmoji('🔄')
   );
-
   return { embeds: [embed], components: [buttons, syncButton] };
 }
+
 async function getEnlistmentMenuPayload(db) {
     const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'enlistment_%' OR key = 'recruiter_role_id'");
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
     const activeQuizId = settingsMap.get('enlistment_quiz_id');
     let activeQuiz = null;
-
-    // --- INÍCIO DA CORREÇÃO DEFINITIVA ---
-    // Esta validação garante que apenas um ID de prova válido (um número pequeno)
-    // seja usado na consulta, ignorando IDs de Discord gigantes.
-    if (activeQuizId && /^\d{1,5}$/.test(activeQuizId)) { // Aceita apenas números com até 5 dígitos
+    if (activeQuizId && /^\d{1,5}$/.test(activeQuizId)) {
         try {
-            // Usamos $1, o placeholder correto para pg, para garantir consistência.
             activeQuiz = await db.get('SELECT title FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
         } catch (e) {
             console.error("Erro ao buscar a prova ativa (ID: " + activeQuizId + "):", e);
-            activeQuiz = null; // Garante que não quebre se o ID não for encontrado
+            activeQuiz = null;
         }
     }
-    // --- FIM DA CORREÇÃO DEFINITIVA ---
-
     const embed = new EmbedBuilder().setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento').setDescription('Configure os canais e cargos para o processo de recrutamento. A prova teórica é opcional.').setImage(SETUP_EMBED_IMAGE_URL).setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .addFields(
             { name: 'Prova Teórica Ativa (Opcional)', value: activeQuiz ? `✅ \`${activeQuiz.title}\`` : '`❌ Desativada`', inline: false },
@@ -515,28 +478,20 @@ async function getQuizManagementPayload(db, quizId) {
             components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel("Voltar ao Hub de Provas").setStyle(ButtonStyle.Primary))]
         };
     }
-
-    // --- INÍCIO DA CORREÇÃO ---
     let questions;
     try {
-        // Verifica se 'quiz.questions' já é um objeto/array. Se for, usa-o diretamente.
-        // Se for uma string (texto), ele faz o parse.
         questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : quiz.questions;
-        if (!Array.isArray(questions)) questions = []; // Garante que temos sempre um array
+        if (!Array.isArray(questions)) questions = [];
     } catch (e) {
-        questions = []; // Se qualquer erro ocorrer, assume um array vazio por segurança.
+        questions = [];
     }
-    // --- FIM DA CORREÇÃO ---
-
     const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
     const isActive = quiz.quiz_id.toString() === activeQuizId;
-
     const embed = new EmbedBuilder()
         .setColor(isActive ? "Green" : "Blue")
         .setTitle(`🛠️ Gerindo a Prova: ${quiz.title}`)
         .setDescription(`**ID da Prova:** \`${quiz.quiz_id}\` | **Nota Mínima:** \`${quiz.passing_score}%\` | **Status:** ${isActive ? '✅ Ativa' : '⚫ Inativa'}`)
         .setFooter({ text: "Use os botões abaixo para gerir as perguntas desta prova." });
-
     if (questions.length > 0) {
         let questionsText = '';
         questions.forEach((q, index) => {
@@ -546,29 +501,23 @@ async function getQuizManagementPayload(db, quizId) {
     } else {
         embed.addFields({ name: 'Nenhuma Pergunta Adicionada', value: 'Use o botão "Adicionar Pergunta" para começar a montar a prova.' });
     }
-
     const components = [];
     const row1 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`quiz_admin_add_question_${quiz.quiz_id}`).setLabel("Adicionar Pergunta").setStyle(ButtonStyle.Success).setEmoji('➕'),
         new ButtonBuilder().setCustomId(`quiz_admin_edit_question_${quiz.quiz_id}`).setLabel("Editar/Apagar Pergunta").setStyle(ButtonStyle.Secondary).setEmoji('✏️').setDisabled(questions.length === 0),
     );
     components.push(row1);
-
     const row2 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`quiz_admin_activate_${quiz.quiz_id}`).setLabel("Ativar Prova").setStyle(ButtonStyle.Primary).setEmoji('✅').setDisabled(isActive),
         new ButtonBuilder().setCustomId(`quiz_admin_delete_quiz_${quiz.quiz_id}`).setLabel("Apagar Prova").setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
         new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel("Voltar ao Hub").setStyle(ButtonStyle.Secondary),
     );
     components.push(row2);
-    
     return { embeds: [embed], components };
 }
 
-
-
-
-// CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
-// Garante que TODAS as funções, incluindo a nova 'getEnlistmentMenuPayload', sejam exportadas.
+// **AQUI ESTÁ A CORREÇÃO PRINCIPAL**
+// Adicionando as constantes ao objeto de exportação.
 module.exports = {
   getMainMenuPayload,
   getCopomMenuPayload,
@@ -583,5 +532,8 @@ module.exports = {
   getTagsMenuPayload,
   getEnlistmentMenuPayload,
   getQuizHubPayload,
-  getQuizManagementPayload  // <-- ADICIONADO AQUI
+  getQuizManagementPayload,
+  SETUP_EMBED_IMAGE_URL,
+  SETUP_FOOTER_TEXT,
+  SETUP_FOOTER_ICON_URL,
 };
