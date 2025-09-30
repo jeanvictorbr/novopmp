@@ -158,6 +158,17 @@ const schemaSQL = `
         passed BOOLEAN NOT NULL,
         attempt_date BIGINT
     );
+        -- NOVA TABELA PARA AULAS AGENDADAS --
+    CREATE TABLE IF NOT EXISTS academy_events (
+        event_id SERIAL PRIMARY KEY,
+        course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
+        guild_id VARCHAR(255) NOT NULL,
+        scheduled_by VARCHAR(255) NOT NULL,
+        scheduled_at BIGINT NOT NULL,
+        event_time BIGINT NOT NULL,
+        title TEXT,
+        status TEXT DEFAULT 'scheduled' -- scheduled, completed, cancelled
+    );
 `;
 
 // Esta função será chamada na inicialização do bot.
