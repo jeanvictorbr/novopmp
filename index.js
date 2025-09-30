@@ -24,7 +24,6 @@ const client = new Client({
     ],
 });
 
-// Sistema de Handlers Unificado e Robusto
 client.handlers = new Collection();
 
 async function startBot() {
@@ -45,7 +44,6 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
-                // A chave de registro é o nome do comando (para /) ou o customId (para componentes)
                 const key = handler.data?.name || handler.customId;
                 if (key) {
                     client.handlers.set(key, handler);
@@ -63,16 +61,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
         let handler = null;
 
-        // Roteador Universal e à Prova de Falhas
-        for (const [handlerKey, handlerValue] of client.handlers.entries()) {
-            if (typeof handlerKey === 'function' && handlerKey(key)) {
-                handler = handlerValue;
-                break;
+        // Roteador Universal e à Prova de Falhas V3
+        // 1. Tenta correspondência exata (mais rápido para comandos e botões simples)
+        handler = client.handlers.get(key);
+
+        // 2. Se não encontrar, testa os handlers de função (para .startsWith e lógicas complexas)
+        if (!handler) {
+            for (const [handlerKey, handlerValue] of client.handlers.entries()) {
+                if (typeof handlerKey === 'function' && handlerKey(key)) {
+                    handler = handlerValue;
+                    break;
+                }
             }
-            if (typeof handlerKey === 'string' && handlerKey === key) {
-                handler = handlerValue;
-                break;
-            }
+        }
+        
+        // 3. Se ainda não encontrou, tenta a lógica de IDs compostos (aqui está a correção)
+        if (!handler && (interaction.isMessageComponent() || interaction.isModalSubmit())) {
+            const baseKey = key.split('|')[0];
+            handler = client.handlers.get(baseKey);
         }
 
         if (!handler) {

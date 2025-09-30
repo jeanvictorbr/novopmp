@@ -4,7 +4,8 @@ const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
 const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../../views/setup_views.js');
 
 module.exports = {
-  customId: (id) => id.startsWith('academy_schedule_course_modal'),
+  // CORREÇÃO: Mudado de função para string estática para ser encontrado pelo novo index.js
+  customId: 'academy_schedule_course_modal',
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
@@ -29,13 +30,11 @@ module.exports = {
 
       const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
 
-      // 1. Salva a aula agendada no banco de dados
       await db.run(
         'INSERT INTO academy_events (course_id, guild_id, scheduled_by, scheduled_at, event_time, title) VALUES ($1, $2, $3, $4, $5, $6)',
         [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), eventTimestamp, title]
       );
       
-      // 2. Notifica a turma na sala de discussão
       if (course.thread_id) {
         const thread = await interaction.guild.channels.fetch(course.thread_id).catch(() => null);
         if (thread) {
@@ -58,7 +57,6 @@ module.exports = {
         }
       }
 
-      // 3. Atualiza o painel público e confirma ao admin
       await updateAcademyPanel(interaction.client);
       await interaction.editReply({ content: `✅ Aula **"${title}"** agendada e turma notificada com sucesso! O painel público foi atualizado.` });
       
