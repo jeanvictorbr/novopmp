@@ -31,11 +31,6 @@ module.exports = {
           .setColor(0x0099FF)
           .setTitle('👮 Central de Operações da Polícia (COPOM)')
           .setDescription('Controle seu status de serviço utilizando os botões abaixo.')
-          .addFields(
-              { name: 'Policiais Ativos', value: '`0`', inline: true },
-              { name: 'Status', value: '`Operações Normais`', inline: true },
-              { name: 'Lista de Oficiais', value: 'Nenhum oficial em serviço.', inline: false }
-          )
           .setTimestamp()
           .setFooter({ text: 'Sistema Phoenix' });
 
@@ -47,7 +42,8 @@ module.exports = {
         
         const infoButtons = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('my_status').setLabel('Meu Status').setStyle(ButtonStyle.Primary).setEmoji('👤'),
-            new ButtonBuilder().setCustomId('ranking').setLabel('Ranking').setStyle(ButtonStyle.Primary).setEmoji('🏆')
+            new ButtonBuilder().setCustomId('ranking').setLabel('Ranking (Patrulha)').setStyle(ButtonStyle.Primary).setEmoji('🏆'),
+            new ButtonBuilder().setCustomId('recruiter_ranking').setLabel('Ranking (Recrutas)').setStyle(ButtonStyle.Primary).setEmoji('👥') // NOVO BOTÃO
         );
 
         const panelMessage = await targetChannel.send({ embeds: [embed], components: [buttons, infoButtons] });
@@ -57,6 +53,7 @@ module.exports = {
         );
         
         await interaction.editReply(`✅ Painel do COPOM implantado com sucesso no canal ${targetChannel}.`);
+        await updateCopomPanel(interaction.client);
       } catch (error) {
         console.error("Erro ao enviar painel do COPOM:", error);
         await interaction.editReply('❌ Ocorreu um erro ao tentar enviar o painel.');

@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../database/db.js');
 
-// Esta é a mesma função de 'my_status', mas adaptada para receber um usuário alvo.
 async function generateDossieEmbed(targetUser, guild) {
     const userId = targetUser.id;
     const now = Math.floor(Date.now() / 1000);
@@ -14,6 +13,10 @@ async function generateDossieEmbed(targetUser, guild) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
+
+    // --- DADOS DE RECRUTAMENTO (NOVO) ---
+    const recruitmentData = await db.get("SELECT COUNT(*) as count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
+    const totalRecruits = recruitmentData?.count || 0;
 
     // --- HISTÓRICO COMPLETO DA ACADEMIA ---
     const certifications = await db.all(`
@@ -41,7 +44,7 @@ async function generateDossieEmbed(targetUser, guild) {
         .setTitle(`Dossiê de Carreira - ${targetUser.username}`)
         .setThumbnail(targetUser.displayAvatarURL())
         .addFields(
-            { name: 'Resumo de Serviço', value: `**Patrulha:** \`${formattedTotalTime}\` | **Cursos:** \`${certifications.length}\` | **Sanções:** \`${sanctions.length}\`` },
+            { name: 'Resumo de Serviço', value: `**Patrulha:** \`${formattedTotalTime}\` | **Cursos:** \`${certifications.length}\` | **Recrutamentos:** \`${totalRecruits}\` | **Sanções:** \`${sanctions.length}\`` },
             { name: '🎓 Certificações da Academia', value: coursesText },
             { name: '📜 Histórico Disciplinar', value: sanctionsText }
         )
@@ -55,7 +58,6 @@ async function generateDossieEmbed(targetUser, guild) {
 
     return embed;
 }
-
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -72,7 +74,6 @@ module.exports = {
         
         try {
             const dossieEmbed = await generateDossieEmbed(targetUser, interaction.guild);
-
             const buttons = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`dossie_remove_sanction_${targetUser.id}`)
@@ -85,13 +86,11 @@ module.exports = {
                     .setStyle(ButtonStyle.Secondary)
                     .setEmoji('✏️')
             );
-
             await interaction.editReply({ embeds: [dossieEmbed], components: [buttons] });
-
         } catch (error) {
             console.error("Erro ao gerar dossiê de outro usuário:", error);
             await interaction.editReply('❌ Ocorreu um erro ao buscar as informações do oficial.');
         }
     },
-    generateDossieEmbed // Exporta a função para ser usada por outros arquivos
+    generateDossieEmbed
 };
