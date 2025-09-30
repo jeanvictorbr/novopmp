@@ -126,7 +126,7 @@ const enlistmentHandler = {
             const parts = customId.split('|');
             const mainAction = parts[0];
     
-            // Nova Rota Robusta (com |)
+            // ROTA ROBUSTA PARA AÇÕES ESPECÍFICAS (com |)
             if (mainAction === 'quiz_admin') {
                 const [, action, quizId, questionIndex] = parts;
                 if (action === 'open_edit_modal') {
@@ -148,13 +148,16 @@ const enlistmentHandler = {
                         questions.splice(questionIndex, 1);
                         await saveQuestions(quizId, questions);
                     }
+                    // Volta para o painel de gerenciamento da prova, que agora estará atualizado
                     return await interaction.editReply(await getQuizManagementPayload(db, quizId));
                 }
+                return; // Encerra aqui se for uma ação com |
             }
     
-            // Rotas Antigas (com _)
+            // Rotas Antigas para Ações Gerais (com _)
             const oldParts = customId.split('_');
             const oldAction = oldParts[2];
+            
             if (oldAction === 'create') {
                 const modal = new ModalBuilder().setCustomId('quiz_admin_create_modal').setTitle('Criar Nova Prova');
                 modal.addComponents(
@@ -171,7 +174,7 @@ const enlistmentHandler = {
             }
             if (oldAction === 'add') {
                 const modal = new ModalBuilder().setCustomId(`quiz_admin_add_question_modal_${oldParts[4]}`).setTitle('Adicionar Nova Pergunta');
-                modal.addComponents(
+                 modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado da Pergunta").setStyle(TextInputStyle.Paragraph).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas (uma por linha)").setStyle(TextInputStyle.Paragraph).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('correct_answer').setLabel("Letra Correta (A, B, C...)").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(1))
@@ -208,9 +211,7 @@ const enlistmentHandler = {
         await interaction.deferReply({ ephemeral: true });
         const title = interaction.fields.getTextInputValue('quiz_title');
         const passingScore = parseInt(interaction.fields.getTextInputValue('quiz_passing_score'), 10);
-        if (isNaN(passingScore) || passingScore < 0 || passingScore > 100) {
-            return await interaction.editReply({ content: '❌ A nota mínima deve ser um número entre 0 e 100.' });
-        }
+        if (isNaN(passingScore) || passingScore < 0 || passingScore > 100) return await interaction.editReply({ content: '❌ A nota mínima deve ser um número entre 0 e 100.' });
         await db.run('INSERT INTO enlistment_quizzes (title, passing_score, questions) VALUES ($1, $2, $3)', [title, passingScore, '[]']);
         await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso! Volte ao menu para vê-la na lista.` });
     },
@@ -249,13 +250,10 @@ const enlistmentHandler = {
             if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
             const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
             if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
-            
             const questions = await getQuestions(quizId);
             if (questions === null) return await interaction.editReply({ content: '❌ Erro: A prova correspondente não foi encontrada.' });
             if (!questions[questionIndex]) return await interaction.editReply({ content: '❌ Erro: A pergunta que você tentou editar não existe mais.' });
-            
             questions[questionIndex] = { question: questionText, options: options, correct: correctAnswerLetter };
-
             const success = await saveQuestions(quizId, questions);
             if (success) await interaction.editReply({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada com sucesso!` });
             else await interaction.editReply({ content: '❌ Falha ao salvar as alterações no banco de dados.' });
@@ -265,6 +263,17 @@ const enlistmentHandler = {
         }
     },
     
+    async handleStartProcess(interaction) { /* ... */ },
+    async handleEnlistmentModal(interaction) { /* ... */ },
+    async startQuiz(interaction) { /* ... */ },
+    async sendQuestion(interaction, channel, quizState, edit = false) { /* ... */ },
+    async handleQuizAnswer(interaction) { /* ... */ },
+    async endQuiz(interaction, channel, quizState) { /* ... */ },
+    async sendLog(interaction, quizState, finalScore, passed) { /* ... */ },
+    async handleApproval(interaction) { /* ... */ },
+};
+
+Object.assign(enlistmentHandler, {
     async handleStartProcess(interaction) {
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
         const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
@@ -282,7 +291,6 @@ const enlistmentHandler = {
         );
         await interaction.showModal(modal);
     },
-
     async handleEnlistmentModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const rpName = interaction.fields.getTextInputValue('rp_name');
@@ -304,7 +312,6 @@ const enlistmentHandler = {
         await channel.send({ content: `Atenção, <@&${recruiterRoleId}>!`, embeds: [embed], components: [buttons] });
         await interaction.editReply({ content: '✅ A sua ficha foi enviada para análise!' });
     },
-    
     async startQuiz(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const userId = interaction.user.id;
@@ -317,7 +324,6 @@ const enlistmentHandler = {
         const quiz = await db.get('SELECT * FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
         const questions = await getQuestions(activeQuizId);
         if (!quiz || !questions || questions.length === 0) return interaction.editReply({ content: '❌ A prova ativa está mal configurada ou não contém perguntas.' });
-        
         let channel;
         try {
             const sanitizedUsername = interaction.user.username.replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'candidato';
@@ -335,9 +341,7 @@ const enlistmentHandler = {
             console.error("Erro ao criar canal de prova:", error);
             return interaction.editReply({ content: '❌ Falha ao criar seu canal de prova. Verifique se tenho permissão para "Gerenciar Canais".' });
         }
-
         const questionMessage = await this.sendQuestion(interaction, channel, { quiz, questions, currentQuestionIndex: 0 });
-
         const quizState = {
             quiz: quiz,
             questions: questions.sort(() => Math.random() - 0.5),
@@ -350,7 +354,6 @@ const enlistmentHandler = {
         userQuizStates.set(userId, quizState);
         await interaction.editReply({ content: `✅ Sua prova começou! Acesse o canal ${channel} para responder.` });
     },
-
     async sendQuestion(interaction, channel, quizState, edit = false) {
         const questionData = quizState.questions[quizState.currentQuestionIndex];
         const guild = interaction.guild;
@@ -379,7 +382,6 @@ const enlistmentHandler = {
         }
         return await channel.send({ embeds: [embed], components: [answerButtons] });
     },
-
     async handleQuizAnswer(interaction) {
         await interaction.deferUpdate();
         const userId = interaction.user.id;
@@ -387,23 +389,21 @@ const enlistmentHandler = {
         if (!quizState || interaction.message.id !== quizState.messageId) return;
         const [, , , questionIndex, chosenLetter] = interaction.customId.split('_');
         const questionData = quizState.questions[questionIndex];
-        
         quizState.answers.push({ question: questionData.question, chosen: chosenLetter, correct: questionData.correct });
         if (chosenLetter === questionData.correct) {
             quizState.score++;
         }
-        
         const newRow = ActionRowBuilder.from(interaction.message.components[0]);
-        newRow.components.forEach((button, index) => {
+        newRow.components.forEach((button) => {
             const buttonBuilder = ButtonBuilder.from(button).setDisabled(true);
             if(button.data.label === chosenLetter){
                 buttonBuilder.setStyle(ButtonStyle.Primary);
             }
-            newRow.components[index] = buttonBuilder;
+            const buttonIndex = newRow.components.indexOf(button);
+            newRow.components[buttonIndex] = buttonBuilder;
         });
         await interaction.editReply({ components: [newRow] });
         quizState.currentQuestionIndex++;
-        
         setTimeout(async () => {
             const channel = await interaction.guild.channels.fetch(quizState.channelId);
             if (quizState.currentQuestionIndex < quizState.questions.length) {
@@ -413,7 +413,6 @@ const enlistmentHandler = {
             }
         }, 1000);
     },
-
     async endQuiz(interaction, channel, quizState) {
         const userId = interaction.user.id;
         const finalScore = (quizState.score / quizState.questions.length) * 100;
@@ -454,7 +453,6 @@ const enlistmentHandler = {
         userQuizStates.delete(userId);
         setTimeout(() => channel.delete('Prova concluída.').catch(() => {}), 60000);
     },
-
     async sendLog(interaction, quizState, finalScore, passed) {
         const { value: logChannelId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'") || {};
         if (!logChannelId) return;
@@ -477,7 +475,6 @@ const enlistmentHandler = {
             .setTimestamp();
         await logChannel.send({ embeds: [logEmbed] });
     },
-    
     async handleApproval(interaction) {
         await interaction.deferUpdate();
         const [action, requestId] = interaction.customId.replace('enlistment_', '').split('_');
@@ -512,6 +509,6 @@ const enlistmentHandler = {
             .setFooter({ text: `Decisão de ${interaction.user.tag}` });
         await interaction.message.edit({ embeds: [originalEmbed], components: [] });
     }
-};
+});
 
 module.exports = enlistmentHandler;
