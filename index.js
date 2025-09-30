@@ -24,8 +24,8 @@ const client = new Client({
     ],
 });
 
-client.stringHandlers = new Collection();
-client.functionHandlers = [];
+client.commandHandlers = new Collection();
+client.componentHandlers = []; // Array unificado para todos os componentes
 
 async function startBot() {
     await initializeDatabase();
@@ -45,14 +45,11 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
-                if (typeof handler.customId === 'function') {
-                    client.functionHandlers.push(handler);
-                    console.log(`[INFO] Handler de Função Carregado: ${file.name}`);
-                } else if (handler.data?.name) {
-                    client.stringHandlers.set(handler.data.name, handler);
+                if (handler.data) { // É um comando de barra
+                    client.commandHandlers.set(handler.data.name, handler);
                     console.log(`[INFO] Handler de Comando Carregado: ${file.name}`);
-                } else if (handler.customId) {
-                    client.stringHandlers.set(handler.customId, handler);
+                } else if (handler.customId) { // É um componente (botão, menu, modal)
+                    client.componentHandlers.push(handler);
                     console.log(`[INFO] Handler de Componente Carregado: ${file.name}`);
                 }
             } catch (error) {
@@ -64,21 +61,27 @@ function loadHandlers(dir) {
 
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
-        const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
-        let handler = client.stringHandlers.get(key);
-
-        if (!handler) {
-            for (const funcHandler of client.functionHandlers) {
-                if (funcHandler.customId(key)) {
-                    handler = funcHandler;
+        let handler;
+        if (interaction.isChatInputCommand()) {
+            handler = client.commandHandlers.get(interaction.commandName);
+        } else if (interaction.isMessageComponent() || interaction.isModalSubmit() || interaction.isUserSelectMenu() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu()) {
+            const key = interaction.customId;
+            for (const componentHandler of client.componentHandlers) {
+                if (typeof componentHandler.customId === 'function' && componentHandler.customId(key)) {
+                    handler = componentHandler;
+                    break;
+                }
+                if (typeof componentHandler.customId === 'string' && componentHandler.customId === key) {
+                    handler = componentHandler;
                     break;
                 }
             }
         }
 
         if (!handler) {
-            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
+            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${interaction.customId || interaction.commandName}`);
         }
+        
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
@@ -90,6 +93,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
 });
+
 
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
@@ -112,10 +116,8 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     try {
         const commandsToDeploy = [];
-        client.stringHandlers.forEach(handler => {
-            if (handler.data) {
-                commandsToDeploy.push(handler.data.toJSON());
-            }
+        client.commandHandlers.forEach(handler => {
+            commandsToDeploy.push(handler.data.toJSON());
         });
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandsToDeploy });
         console.log(`[INFO] Comandos (/) registrados com sucesso.`);
