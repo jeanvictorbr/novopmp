@@ -3,6 +3,7 @@
 // Importações Globais
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder } = require('discord.js');
 const db = require('../database/db.js');
+const enlistmentHandler = require('./handlers/enlistment_handler.js');
 const { getEnlistmentMenuPayload, getMainMenuPayload } = require('../views/setup_views.js');
 
 // Mapa para estado das provas
@@ -22,6 +23,10 @@ module.exports = {
         // Rota para o Módulo de Provas (Admin e Público)
         if (customId.startsWith('quiz_')) {
             return await handleQuiz(interaction);
+        }
+         // Rota para o Módulo de Alistamento V2
+        if (enlistmentHandler.customId(customId)) {
+            return await enlistmentHandler.execute(interaction);
         }
         // Rota para o Módulo de Alistamento (Público)
         if (customId.startsWith('enlistment_')) {
