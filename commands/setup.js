@@ -9,6 +9,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     
   async execute(interaction) {
+    // CORREÇÃO: A propriedade 'ephemeral: true' foi removida.
     await interaction.deferReply({ ephemeral: true });
 
     try {

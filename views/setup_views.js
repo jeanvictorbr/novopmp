@@ -416,41 +416,42 @@ async function getEnlistmentMenuPayload(db) {
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
     const activeQuizId = settingsMap.get('enlistment_quiz_id');
     let activeQuiz = null;
-    if (activeQuizId) {
-        activeQuiz = await db.get('SELECT title FROM enlistment_quizzes WHERE quiz_id = ?', [activeQuizId]);
-    }
 
-    const embed = new EmbedBuilder()
-        .setColor('White')
-        .setTitle('🗂️ Configuração do Módulo de Alistamento V2')
-        .setDescription('Configure os canais e cargos para o processo de recrutamento. A prova teórica é opcional e define o fluxo.')
-        .setImage(SETUP_EMBED_IMAGE_URL)
-        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
+    // --- INÍCIO DA CORREÇÃO ---
+    // Adicionamos uma validação para garantir que o ID é um número antes de consultar a base de dados.
+    if (activeQuizId && !isNaN(parseInt(activeQuizId, 10))) {
+        activeQuiz = await db.get('SELECT title FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
+    } else if (activeQuizId) {
+        // Se o ID não for um número válido, ele será ignorado, prevenindo o crash.
+        console.warn(`[CORREÇÃO AUTOMÁTICA] Um ID de prova inválido ('${activeQuizId}') foi encontrado e ignorado.`);
+    }
+    // --- FIM DA CORREÇÃO ---
+
+    const embed = new EmbedBuilder().setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento').setDescription('Configure os canais e cargos para o processo de recrutamento. A prova teórica é opcional.').setImage(SETUP_EMBED_IMAGE_URL).setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .addFields(
             { name: 'Prova Teórica Ativa (Opcional)', value: activeQuiz ? `✅ \`${activeQuiz.title}\`` : '`❌ Desativada`', inline: false },
+            { name: 'Cargo Pós-Prova (se ativa)', value: settingsMap.has('enlistment_quiz_passed_role_id') ? `✅ <@&${settingsMap.get('enlistment_quiz_passed_role_id')}>` : '`⚠️ Não definido`', inline: true },
             { name: 'Canal de Alistamento', value: settingsMap.has('enlistment_form_channel_id') ? `✅ <#${settingsMap.get('enlistment_form_channel_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `✅ <#${settingsMap.get('enlistment_approval_channel_id')}>` : '`❌ Não definido`', inline: true },
-            { name: 'Cargo Pós-Prova', value: settingsMap.has('enlistment_quiz_passed_role_id') ? `✅ <@&${settingsMap.get('enlistment_quiz_passed_role_id')}>` : '`⚠️ Não definido`', inline: true },
             { name: 'Cargo de Recruta (Final)', value: settingsMap.has('enlistment_recruit_role_id') ? `✅ <@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Cargo de Recrutador (Staff)', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true }
         );
-
     const row1 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('enlistment_setup_set_form_channel').setLabel('Canal de Alistamento').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_approval_channel').setLabel('Canal Aprovações').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_passed_role').setLabel('Cargo Pós-Prova').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('enlistment_setup_set_recruiter_role').setLabel('Cargo Recrutador').setStyle(ButtonStyle.Secondary)
     );
     const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_passed_role').setLabel('Cargo Pós-Prova').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_recruit_role').setLabel('Cargo Recruta').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('enlistment_setup_set_recruiter_role').setLabel('Cargo Recrutador').setStyle(ButtonStyle.Secondary)
     );
     const row3 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel('Ativar e Gerir Provas').setStyle(ButtonStyle.Primary).setEmoji('✍️'),
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
     );
-
     return { embeds: [embed], components: [row1, row2, row3] };
 }
+
 
 
 
