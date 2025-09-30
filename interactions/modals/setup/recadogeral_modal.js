@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 // CORREÇÃO: O caminho foi ajustado de '../../' para '../../../'
-const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../views/setup_views.js');
+const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../views/setup_views.js');
 
 module.exports = {
   customId: 'recado_geral_modal',
