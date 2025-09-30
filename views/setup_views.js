@@ -430,6 +430,7 @@ async function getEnlistmentMenuPayload(db) {
 }
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
+// Garante que TODAS as funções, incluindo a nova 'getEnlistmentMenuPayload', sejam exportadas.
 module.exports = {
   getMainMenuPayload,
   getCopomMenuPayload,
@@ -442,5 +443,5 @@ module.exports = {
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
   getTagsMenuPayload,
-  getEnlistmentMenuPayload // Mantém a função correta que estamos a usar
+  getEnlistmentMenuPayload // <-- ADICIONADO AQUI
 };
