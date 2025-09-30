@@ -100,8 +100,12 @@ const enlistmentHandler = {
                 await interaction.deferUpdate();
                 const [selectedQuizId, questionIndex] = interaction.values[0].split('_');
                 const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
-                const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+                const questions = Array.isArray(quiz?.questions) ? quiz.questions : [];
                 const question = questions[questionIndex];
+
+                if (!question) {
+                    return interaction.editReply({ content: '❌ A pergunta selecionada não foi encontrada.', components: [] });
+                }
 
                 const embed = new EmbedBuilder().setColor("Yellow").setTitle(`Gerindo Pergunta #${parseInt(questionIndex, 10) + 1}`).setDescription(question.question);
                 const buttons = new ActionRowBuilder().addComponents(
@@ -141,7 +145,7 @@ const enlistmentHandler = {
             } else if (action === 'edit' && parts[3] === 'question') {
                 const quizId = parts[4];
                 const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-                const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+                const questions = Array.isArray(quiz?.questions) ? quiz.questions : [];
                 if (questions.length === 0) return interaction.reply({ content: 'Não há perguntas para editar.', ephemeral: true });
                 const options = questions.map((q, index) => ({ label: `Pergunta #${index + 1}: ${q.question.substring(0, 80)}`, value: `${quizId}_${index}` }));
                 const selectMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('quiz_admin_select_question_to_manage').setPlaceholder('Selecione uma pergunta...').addOptions(options));
@@ -149,8 +153,11 @@ const enlistmentHandler = {
             } else if (action === 'open' && parts[3] === 'edit' && parts[4] === 'modal') {
                 const [,,,, selectedQuizId, questionIndex] = parts;
                 const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
-                const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+                const questions = Array.isArray(quiz?.questions) ? quiz.questions : [];
                 const questionData = questions[questionIndex];
+                if (!questionData) {
+                    return interaction.reply({ content: '❌ A pergunta selecionada não foi encontrada.', ephemeral: true });
+                }
                 const modal = new ModalBuilder().setCustomId(`quiz_admin_edit_question_modal_${selectedQuizId}_${questionIndex}`).setTitle(`Editando Pergunta #${parseInt(questionIndex, 10) + 1}`);
                 modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado").setStyle(TextInputStyle.Paragraph).setValue(questionData.question).setRequired(true)),
@@ -162,7 +169,7 @@ const enlistmentHandler = {
                 await interaction.deferUpdate();
                 const [,,,, selectedQuizId, questionIndex] = parts;
                 const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
-                const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+                const questions = Array.isArray(quiz?.questions) ? quiz.questions : [];
                 questions.splice(questionIndex, 1);
                 await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), selectedQuizId]);
                 
