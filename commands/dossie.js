@@ -5,7 +5,7 @@ async function generateDossieEmbed(targetUser, guild) {
     const userId = targetUser.id;
     const now = Math.floor(Date.now() / 1000);
 
-    // --- DADOS GERAIS DE PATRULHA ---
+    // DADOS DE PATRULHA
     const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total_seconds FROM patrol_history WHERE user_id = $1', [userId]);
     const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
     const activeSeconds = activeSession ? now - activeSession.start_time : 0;
@@ -14,11 +14,11 @@ async function generateDossieEmbed(targetUser, guild) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
 
-    // --- DADOS DE RECRUTAMENTO (CORRIGIDO E ROBUSTO) ---
+    // DADOS DE RECRUTAMENTO
     const recruitmentData = await db.get("SELECT COUNT(*)::int AS count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
     const totalRecruits = recruitmentData?.count || 0;
 
-    // --- HISTÓRICO COMPLETO DA ACADEMIA ---
+    // HISTÓRICO DA ACADEMIA
     const certifications = await db.all(`
         SELECT ac.name, uc.completion_date, uc.certified_by
         FROM user_certifications uc
@@ -27,7 +27,18 @@ async function generateDossieEmbed(targetUser, guild) {
     `, [userId]);
     let coursesText = certifications.map(c => `> ✅ **${c.name}**\n> Concluído em <t:${c.completion_date}:d> | Certificado por: <@${c.certified_by || 'Desconhecido'}>`).join('\n\n') || '`Nenhum curso concluído.`';
 
-    // --- HISTÓRICO DISCIPLINAR COMPLETO ---
+    // HISTÓRICO DE CONDECORAÇÕES (NOVO)
+    const decorations = await db.all(`
+        SELECT m.name, m.emoji, ud.awarded_by, ud.awarded_at
+        FROM user_decorations ud
+        JOIN decorations_medals m ON ud.medal_id = m.medal_id
+        WHERE ud.user_id = $1
+        ORDER BY ud.awarded_at DESC
+    `, [userId]);
+    let decorationsText = decorations.map(d => `> ${d.emoji || '🏆'} **${d.name}** em <t:${d.awarded_at}:d>\n> Concedida por: <@${d.awarded_by}>`).join('\n\n') || '`Nenhuma condecoração recebida.`';
+
+
+    // HISTÓRICO DISCIPLINAR
     const sanctions = await db.all(`
         SELECT sanction_id, sanction_type, reason, applied_by, applied_at
         FROM corregedoria_sanctions
@@ -35,17 +46,18 @@ async function generateDossieEmbed(targetUser, guild) {
     `, [userId]);
     let sanctionsText = sanctions.map(s => `> **${s.sanction_type}** (ID: ${s.sanction_id}) em <t:${s.applied_at}:d>\n> Aplicado por: <@${s.applied_by}>\n> Motivo: *${s.reason}*`).join('\n\n') || '`Nenhuma sanção registrada.`';
 
-    // --- PUNIÇÃO ATIVA ---
+    // PUNIÇÃO ATIVA
     const activePunishment = await db.get('SELECT s.sanction_type, ap.expires_at FROM active_punishments ap JOIN corregedoria_sanctions s ON ap.sanction_id = s.sanction_id WHERE ap.user_id = $1', [userId]);
 
-    // --- MONTAGEM FINAL DO DOSSIÊ ---
+    // MONTAGEM FINAL DO DOSSIÊ
     const embed = new EmbedBuilder()
         .setColor('Blue')
         .setTitle(`Dossiê de Carreira - ${targetUser.username}`)
         .setThumbnail(targetUser.displayAvatarURL())
         .addFields(
-            { name: 'Resumo de Serviço', value: `**Patrulha:** \`${formattedTotalTime}\` | **Cursos:** \`${certifications.length}\` | **Recrutamentos:** \`${totalRecruits}\` | **Sanções:** \`${sanctions.length}\`` },
+            { name: 'Resumo de Serviço', value: `**Patrulha:** \`${formattedTotalTime}\` | **Cursos:** \`${certifications.length}\` | **Recrutamentos:** \`${totalRecruits}\` | **Medalhas:** \`${decorations.length}\` | **Sanções:** \`${sanctions.length}\`` },
             { name: '🎓 Certificações da Academia', value: coursesText },
+            { name: '🏆 Condecorações e Honrarias', value: decorationsText },
             { name: '📜 Histórico Disciplinar', value: sanctionsText }
         )
         .setTimestamp()
@@ -75,16 +87,8 @@ module.exports = {
         try {
             const dossieEmbed = await generateDossieEmbed(targetUser, interaction.guild);
             const buttons = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`dossie_remove_sanction_${targetUser.id}`)
-                    .setLabel('Remover Sanção')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('🗑️'),
-                new ButtonBuilder()
-                    .setCustomId(`dossie_edit_sanction_${targetUser.id}`)
-                    .setLabel('Editar Sanção')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('✏️')
+                new ButtonBuilder().setCustomId(`dossie_remove_sanction_${targetUser.id}`).setLabel('Remover Sanção').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+                new ButtonBuilder().setCustomId(`dossie_edit_sanction_${targetUser.id}`).setLabel('Editar Sanção').setStyle(ButtonStyle.Secondary).setEmoji('✏️')
             );
             await interaction.editReply({ embeds: [dossieEmbed], components: [buttons] });
         } catch (error) {

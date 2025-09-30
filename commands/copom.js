@@ -42,8 +42,7 @@ module.exports = {
         
         const infoButtons = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('my_status').setLabel('Meu Status').setStyle(ButtonStyle.Primary).setEmoji('👤'),
-            new ButtonBuilder().setCustomId('ranking').setLabel('Ranking (Patrulha)').setStyle(ButtonStyle.Primary).setEmoji('🏆'),
-            new ButtonBuilder().setCustomId('recruiter_ranking').setLabel('Ranking (Recrutas)').setStyle(ButtonStyle.Primary).setEmoji('👥') // NOVO BOTÃO
+            new ButtonBuilder().setCustomId('ranking').setLabel('Ranking (Patrulha)').setStyle(ButtonStyle.Primary).setEmoji('🏆')
         );
 
         const panelMessage = await targetChannel.send({ embeds: [embed], components: [buttons, infoButtons] });
