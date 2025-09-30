@@ -125,16 +125,29 @@ const enlistmentHandler = {
 
         if (action === 'edit' && parts[3] === 'question') {
             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-            const questions = JSON.parse(quiz.questions);
+            
+            // --- INÍCIO DA CORREÇÃO PREVENTIVA ---
+            let questions;
+            try {
+                questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : quiz.questions;
+                if (!Array.isArray(questions)) questions = [];
+            } catch (e) {
+                questions = [];
+            }
+            // --- FIM DA CORREÇÃO PREVENTIVA ---
+
+            if (questions.length === 0) {
+                 return interaction.reply({ content: 'Não há perguntas para editar nesta prova.', ephemeral: true });
+            }
+
             const options = questions.map((q, index) => ({
                 label: `Pergunta #${index + 1}: ${q.question.substring(0, 80)}`,
                 value: `edit_question_${quizId}_${index}`,
                 description: `Resposta Correta: ${q.correct}`
             }));
-            const selectMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('quiz_admin_select_question_to_edit').setPlaceholder('Selecione uma pergunta para editar ou apagar...').addOptions(options));
+            const selectMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('quiz_admin_select_question_to_edit').setPlaceholder('Selecione uma pergunta para editar...').addOptions(options));
             return await interaction.reply({ content: 'Selecione uma pergunta abaixo:', components: [selectMenu], ephemeral: true });
         }
-
         if (interaction.isStringSelectMenu() && customId === 'quiz_admin_select_question_to_edit') {
              const [actionType, entity, selectedQuizId, questionIndex] = interaction.values[0].split('_');
              const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);

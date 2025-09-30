@@ -510,14 +510,24 @@ async function getEnlistmentMenuPayload(db) {
 async function getQuizManagementPayload(db, quizId) {
     const quiz = await db.get('SELECT * FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
     if (!quiz) {
-        // Retorna um payload de erro se a prova for apagada enquanto alguém a visualiza
         return {
-            embeds: [new EmbedBuilder().setColor("Red").setTitle("Erro").setDescription("Esta prova não foi encontrada. Pode ter sido apagada.")],
+            embeds: [new EmbedBuilder().setColor("Red").setTitle("Erro").setDescription("Esta prova não foi encontrada.")],
             components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel("Voltar ao Hub de Provas").setStyle(ButtonStyle.Primary))]
         };
     }
 
-    const questions = JSON.parse(quiz.questions);
+    // --- INÍCIO DA CORREÇÃO ---
+    let questions;
+    try {
+        // Verifica se 'quiz.questions' já é um objeto/array. Se for, usa-o diretamente.
+        // Se for uma string (texto), ele faz o parse.
+        questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : quiz.questions;
+        if (!Array.isArray(questions)) questions = []; // Garante que temos sempre um array
+    } catch (e) {
+        questions = []; // Se qualquer erro ocorrer, assume um array vazio por segurança.
+    }
+    // --- FIM DA CORREÇÃO ---
+
     const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
     const isActive = quiz.quiz_id.toString() === activeQuizId;
 
@@ -530,8 +540,7 @@ async function getQuizManagementPayload(db, quizId) {
     if (questions.length > 0) {
         let questionsText = '';
         questions.forEach((q, index) => {
-            questionsText += `**${index + 1}. ${q.question}**\n`;
-            questionsText += `*Resposta Correta: ${q.correct}*\n\n`;
+            questionsText += `**${index + 1}. ${q.question}**\n*Resposta Correta: ${q.correct}*\n\n`;
         });
         embed.addFields({ name: 'Perguntas Atuais', value: questionsText });
     } else {
