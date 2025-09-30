@@ -1,4 +1,4 @@
-const { RoleSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { RoleSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../../database/db.js');
 const { getTagsMenuPayload } = require('../../views/setup_views.js');
 const { updateMemberTag } = require('../../utils/tagUpdater.js');
@@ -29,9 +29,7 @@ const tagsHandler = {
     async showRemoveSelect(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const tags = await db.all('SELECT role_id, tag FROM role_tags');
-        if (tags.length === 0) {
-            return await interaction.editReply({ content: 'Não há tags configuradas para remover.' });
-        }
+        if (tags.length === 0) return await interaction.editReply({ content: 'Não há tags configuradas para remover.' });
 
         const options = await Promise.all(tags.map(async t => {
             const role = await interaction.guild.roles.fetch(t.role_id).catch(() => null);
@@ -55,19 +53,18 @@ const tagsHandler = {
     },
 
     async handleSetTag(interaction) {
-        // CORREÇÃO: Responde à interação do modal de forma efêmera.
+        // CORREÇÃO DEFINITIVA: O modal não pode editar a mensagem anterior.
+        // Ele responde a si mesmo e o painel será atualizado na próxima navegação.
         await interaction.deferReply({ ephemeral: true });
         const roleId = interaction.customId.split('_').pop();
         const tag = interaction.fields.getTextInputValue('tag_input').trim();
 
         await db.run('INSERT INTO role_tags (role_id, tag) VALUES ($1, $2) ON CONFLICT (role_id) DO UPDATE SET tag = $2', [roleId, tag]);
         
-        // Apenas confirma o sucesso, não tenta editar o painel anterior.
         await interaction.editReply({ content: '✅ Tag configurada com sucesso! O painel será atualizado quando você voltar a ele.'});
     },
 
     async handleRemoveTag(interaction) {
-        // CORREÇÃO: Responde à interação do menu de forma efêmera.
         await interaction.deferReply({ ephemeral: true });
         const roleId = interaction.values[0];
         await db.run('DELETE FROM role_tags WHERE role_id = $1', [roleId]);
@@ -75,29 +72,54 @@ const tagsHandler = {
         await interaction.editReply({ content: '✅ Tag removida com sucesso! O painel será atualizado quando você voltar a ele.', components: []});
     },
 
+    // --- NOVA FUNÇÃO DE SINCRONIZAÇÃO COMPLETA ---
     async syncAllTags(interaction) {
         await interaction.deferReply({ ephemeral: true });
-        await interaction.editReply('🔄 **Sincronização iniciada...** Verificando todos os membros do servidor. Isso pode levar alguns instantes.');
         
-        let logMessage = '**Log de Sincronização:**\n';
-        let changesCount = 0;
-
         const members = await interaction.guild.members.fetch();
-        
-        for (const member of members.values()) {
-            const oldNickname = member.nickname || member.user.displayName;
-            await updateMemberTag(member);
-            const updatedMember = await member.fetch(true);
-            const newNickname = updatedMember.nickname || updatedMember.user.displayName;
+        const totalMembers = members.size;
+        let checkedCount = 0;
+        let changesCount = 0;
+        let permissionErrors = 0;
 
-            if (oldNickname !== newNickname) {
+        const updateInterval = setInterval(() => {
+            const embed = new EmbedBuilder()
+                .setTitle('🔄 Sincronizando Tags...')
+                .setDescription('Verificando nicknames em tempo real.')
+                .addFields(
+                    { name: 'Progresso', value: `\`${checkedCount} / ${totalMembers}\` membros verificados.`, inline: true },
+                    { name: 'Alterações', value: `\`${changesCount}\``, inline: true },
+                    { name: 'Falhas de Perm.', value: `\`${permissionErrors}\``, inline: true }
+                );
+            interaction.editReply({ embeds: [embed] });
+        }, 2000); // Atualiza a embed a cada 2 segundos
+
+        for (const member of members.values()) {
+            const oldNickname = member.nickname;
+            const result = await updateMemberTag(member);
+            
+            if (result === 'PERMISSION_ERROR') {
+                permissionErrors++;
+            } else if (result) { // 'result' é true se houve mudança
                 changesCount++;
-                logMessage += `✅ **${member.user.tag}** -> \`${newNickname}\`\n`;
             }
+            checkedCount++;
         }
-        
-        logMessage += `\n**Sincronização concluída!** ${changesCount} nicknames foram atualizados.`;
-        await interaction.editReply({ content: logMessage });
+
+        clearInterval(updateInterval); // Para o atualizador em tempo real
+
+        const finalEmbed = new EmbedBuilder()
+            .setTitle('✅ Sincronização Concluída!')
+            .setColor('Green')
+            .setDescription('A verificação de todas as tags de membros foi finalizada.')
+            .addFields(
+                { name: 'Total de Membros Verificados', value: `\`${checkedCount}\``, inline: true },
+                { name: 'Nicknames Alterados', value: `\`${changesCount}\``, inline: true },
+                { name: 'Falhas por Permissão', value: `\`${permissionErrors}\``, inline: true }
+            )
+            .setFooter({ text: 'Membros com cargos mais altos que o bot não podem ser alterados.' });
+
+        await interaction.editReply({ embeds: [finalEmbed] });
     }
 };
 
