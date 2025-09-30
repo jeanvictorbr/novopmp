@@ -2,7 +2,7 @@ const { StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder } = require('dis
 const db = require('../../../database/db.js');
 
 module.exports = {
-  customId: 'academy_schedule_course',
+  customId: 'academy_schedule_waiting_list',
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
@@ -17,7 +17,7 @@ module.exports = {
         `);
 
         if (coursesWithEnrollments.length === 0) {
-            return await interaction.editReply('Não há cursos com oficiais na lista de espera para agendar.');
+            return await interaction.editReply({ content: 'Não há cursos com oficiais na lista de espera para agendar.', embeds: [], components: [] });
         }
 
         const options = coursesWithEnrollments.map(course => ({
@@ -41,7 +41,7 @@ module.exports = {
 
     } catch (error) {
       console.error("Erro ao preparar agendamento de curso:", error);
-      await interaction.editReply('❌ Ocorreu um erro ao carregar os cursos com listas de espera.');
+      await interaction.editReply({ content: '❌ Ocorreu um erro ao carregar os cursos com listas de espera.', embeds: [], components: [] });
     }
   },
 };

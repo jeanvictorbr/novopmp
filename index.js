@@ -24,11 +24,11 @@ const client = new Client({
     ],
 });
 
-client.handlers = new Collection();
+client.stringHandlers = new Collection();
+client.functionHandlers = [];
 
 async function startBot() {
     await initializeDatabase();
-    // Carrega todos os handlers de forma recursiva a partir das pastas principais
     loadHandlers(path.join(__dirname, 'commands'));
     loadHandlers(path.join(__dirname, 'interactions'));
     await registerSlashCommands();
@@ -45,11 +45,15 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
-                // A chave de registro é o nome do comando (para /) ou o customId (para componentes)
-                const key = handler.data?.name || handler.customId;
-                if (key) {
-                    client.handlers.set(key, handler);
-                    console.log(`[INFO] Handler Carregado: ${file.name}`);
+                if (typeof handler.customId === 'function') {
+                    client.functionHandlers.push(handler);
+                    console.log(`[INFO] Handler de Função Carregado: ${file.name}`);
+                } else if (handler.data?.name) {
+                    client.stringHandlers.set(handler.data.name, handler);
+                    console.log(`[INFO] Handler de Comando Carregado: ${file.name}`);
+                } else if (handler.customId) {
+                    client.stringHandlers.set(handler.customId, handler);
+                    console.log(`[INFO] Handler de Componente Carregado: ${file.name}`);
                 }
             } catch (error) {
                 console.error(`[ERRO] Falha ao carregar o handler: ${file.name}`, error);
@@ -61,30 +65,14 @@ function loadHandlers(dir) {
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
-        let handler = null;
-
-        // Lógica de Roteamento Robusta e Unificada
-        for (const [handlerKey, handlerValue] of client.handlers.entries()) {
-            // Se a chave for uma função (para customIds dinâmicos ou que usam .startsWith)
-            if (typeof handlerKey === 'function' && handlerKey(key)) {
-                handler = handlerValue;
-                break;
-            }
-            // Se a chave for uma string (para comandos / e customIds exatos)
-            if (typeof handlerKey === 'string' && handlerKey === key) {
-                handler = handlerValue;
-                break;
-            }
-        }
+        let handler = client.stringHandlers.get(key);
 
         if (!handler) {
-            // Fallback para IDs dinâmicos que usam separadores, como 'acao|dado1|dado2'
-            const baseKey = key.split('|')[0];
-            handler = client.handlers.get(baseKey);
-
-            // Verificação final para garantir que o handler encontrado é o correto
-            if (handler && typeof handler.customId === 'function' && !handler.customId(key)) {
-                handler = null; 
+            for (const funcHandler of client.functionHandlers) {
+                if (funcHandler.customId(key)) {
+                    handler = funcHandler;
+                    break;
+                }
             }
         }
 
@@ -102,7 +90,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
 });
-
 
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
@@ -125,11 +112,11 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     try {
         const commandsToDeploy = [];
-        for (const handler of client.handlers.values()){
-            if(handler.data) {
+        client.stringHandlers.forEach(handler => {
+            if (handler.data) {
                 commandsToDeploy.push(handler.data.toJSON());
             }
-        }
+        });
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandsToDeploy });
         console.log(`[INFO] Comandos (/) registrados com sucesso.`);
     } catch (error) {
