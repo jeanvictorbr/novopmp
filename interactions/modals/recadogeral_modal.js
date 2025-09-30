@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../../views/setup_views.js');
 
 module.exports = {
   customId: 'recado_geral_modal',
@@ -8,17 +9,14 @@ module.exports = {
     const messageContent = interaction.fields.getTextInputValue('recado_geral_input');
     const guild = interaction.guild;
 
-    // CORREÇÃO: Informações do rodapé definidas diretamente aqui para evitar erros de importação.
-    const footerText = 'PoliceFlow• Sistema de Gestão Policial 🥇';
-    const footerIconURL = 'https://media.tenor.com/UHQFxxKqRGgAAAAi/police-bttv.gif';
-
     const embed = new EmbedBuilder()
         .setColor('Blue')
         .setAuthor({ name: guild.name, iconURL: guild.iconURL() })
         .setTitle('📢 Comunicado Oficial')
+        // CORREÇÃO: A mensagem do admin agora é envolvida por ``` para formatação de bloco de código.
         .setDescription(`\`\`\`${messageContent}\`\`\``)
         .setTimestamp()
-        .setFooter({ text: footerText, iconURL: footerIconURL });
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
 
     await interaction.editReply('🚀 **Iniciando o envio...** Irei notificar-te quando o processo terminar.');
 
