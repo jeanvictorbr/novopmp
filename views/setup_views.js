@@ -2,7 +2,7 @@ const { EmbedBuilder, StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, 
 const db = require('../database/db.js');
 const SETUP_EMBED_IMAGE_URL = 'https://i.imgur.com/O9Efa95.gif';
 const SETUP_FOOTER_TEXT = 'PoliceFlow• Sistema de Gestão Policial 🥇';      // Texto do rodapé
-const SETUP_FOOTER_ICON_URL = 'https://media.tenor.com/UHQFxxKqRGgAAAAi/police-bttv.gif'; 
+const SETUP_FOOTER_ICON_URL = 'https://media.tenor.com/UHQFxxKqRGgAAAAi/police-bttv.gif';
 
 async function getMainMenuPayload() {
   const embed = new EmbedBuilder()
@@ -10,7 +10,7 @@ async function getMainMenuPayload() {
     .setTitle('Painel de Configuração do Police Flow')
     .setDescription('`Selecione o módulo que você deseja configurar no menu abaixo.`')
     .setImage(SETUP_EMBED_IMAGE_URL)
-    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
+    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('setup_module_select')
     .setPlaceholder('Escolha um módulo...')
@@ -125,13 +125,12 @@ async function getAcademyMenuPayload(db) {
         .setTitle('🎓 Configuração do Módulo Academia')
         .setDescription('Gerencie cursos, instrutores e certificações.')
         .setImage(SETUP_EMBED_IMAGE_URL)
-        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .setFields(
             { name: 'Canal de Estudos (Painel Público)', value: settingsMap.has('academy_channel_id') ? `<#${settingsMap.get('academy_channel_id')}>` : '`Não definido`', inline: false },
             { name: 'Canal de Discussões (Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`Não definido`', inline: false },
             { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false }
         )
-        .setFooter({ text: 'As alterações são salvas instantaneamente.' });
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
     
     if (courses.length > 0) {
         const coursesList = courses.map(c => `**${c.name}**\n\`ID: ${c.course_id}\` - Horas Mínimas: \`${c.required_hours}\``).join('\n\n');
@@ -185,7 +184,7 @@ async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
     .setTitle(`Dashboard de Inscrições: ${course.name}`)
     .setDescription('Aprove ou recuse os oficiais inscritos no curso.')
     .setImage(SETUP_EMBED_IMAGE_URL)
-    .setFooter({ text: 'Certifique apenas os oficiais que completaram o curso.' });
+    .setFooter({ text: 'Certifique apenas os oficiais que completaram o curso.', iconURL: SETUP_FOOTER_ICON_URL });
 
   const options = await Promise.all(enrollments.map(async (e) => {
     const member = await guild.members.fetch(e.user_id).catch(() => null);
@@ -249,7 +248,7 @@ async function getCorregedoriaMenuPayload(db) {
         { name: '📜 Canal de Logs (Dashboards)', value: `Onde os dashboards de cada caso são postados.\n**Status:** ${formatSetting('corregedoria_logs_channel_id', 'channel')}` },
         { name: '📄 Canal de Transcripts', value: `Onde os arquivos de texto das conversas são salvos.\n**Status:** ${formatSetting('corregedoria_transcript_channel_id', 'channel')}` }
     )
-    .setFooter({ text: 'Use os botões abaixo para definir cada configuração.' });
+    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
     
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup_corregedoria_set_role').setLabel('Definir Cargo').setStyle(ButtonStyle.Secondary),
@@ -282,7 +281,7 @@ async function getCorregedoriaPunishmentsMenuPayload(db) {
         .setTitle('📜 Gerenciamento de Punições Pré-definidas')
         .setDescription('Adicione, remova ou edite as sanções que podem ser aplicadas nos tickets. Estas opções aparecerão no menu de seleção ao aplicar uma punição.')
         .setImage(SETUP_EMBED_IMAGE_URL)
-        .setFooter({ text: 'É recomendado manter a lista de punições clara e objetiva.' });
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
     
     if (punishments.length > 0) {
         const punishmentList = punishments.map(p => `**- ${p.name}:** *${p.description}*`).join('\n');
@@ -301,7 +300,6 @@ async function getCorregedoriaPunishmentsMenuPayload(db) {
     return { embeds: [embed], components: [buttons] };
 }
 
-// Dentro do arquivo, substitua a função getDecorationsMenuPayload por esta versão atualizada:
 async function getDecorationsMenuPayload(db) {
   const settings = await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'");
   const embed = new EmbedBuilder()
@@ -319,14 +317,12 @@ async function getDecorationsMenuPayload(db) {
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('decorations_set_channel').setLabel('Definir Canal de Anúncios').setStyle(ButtonStyle.Secondary),
-    // NOVO BOTÃO ADICIONADO AQUI
     new ButtonBuilder().setCustomId('decorations_set_promote_image').setLabel('Definir Imagem de Promoção').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [embed], components: [row1, row2] };
 }
 
-// Dentro do arquivo, substitua APENAS a função getDecorationsManageMedalsPayload por esta:
 async function getDecorationsManageMedalsPayload(db) {
     const medals = await db.all("SELECT emoji, name, description FROM decorations_medals ORDER BY name ASC");
     const embed = new EmbedBuilder()
@@ -345,7 +341,7 @@ async function getDecorationsManageMedalsPayload(db) {
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('decorations_add_medal').setLabel('Criar Nova Medalha').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('decorations_remove_medal').setLabel('Remover Medalha').setStyle(ButtonStyle.Danger).setDisabled(medals.length === 0),
-        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary) // BOTÃO ADICIONADO AQUI
+        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
     return { embeds: [embed], components: [buttons] };
 }
@@ -355,6 +351,8 @@ async function getHierarchyMenuPayload(db) {
   const embed = new EmbedBuilder()
     .setColor('Blue').setTitle('📊 Configuração do Módulo Hierarquia')
     .setDescription('Gerencie a vitrine de cargos auto-atualizável.')
+    .setImage(SETUP_EMBED_IMAGE_URL)
+    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
     .addFields(
         { name: 'Canal da Vitrine', value: settingsMap.has('hierarchy_channel_id') ? `<#${settingsMap.get('hierarchy_channel_id')}>` : '`Não definido`' },
         { name: 'Título', value: settingsMap.has('hierarchy_title') ? `\`${settingsMap.get('hierarchy_title')}\`` : '`Padrão`' },
@@ -380,13 +378,17 @@ async function getTagsMenuPayload(db) {
   const embed = new EmbedBuilder()
     .setColor('Greyple')
     .setTitle('🏷️ Configuração do Módulo de Tags')
-    .setDescription('Configure as tags que serão aplicadas automaticamente aos nicknames dos membros com base em seus cargos. O bot sempre aplicará a tag do cargo mais alto.');
+    .setDescription('Configure as tags que serão aplicadas automaticamente aos nicknames dos membros com base em seus cargos. O bot sempre aplicará a tag do cargo mais alto.')
+    .setImage(SETUP_EMBED_IMAGE_URL)
+    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
 
   if (tags.length > 0) {
     let tagList = '';
+    // Corrigido: Iterar sobre os resultados de forma segura
     for (const t of tags) {
-        const role = await db.query('SELECT name FROM guilds_roles WHERE id = $1', [t.role_id]); // Supondo que você tenha uma tabela de cargos
-        tagList += `\`[${t.tag}]\` - Cargo: ${role.rows.length > 0 ? role.rows[0].name : `<@&${t.role_id}>`}\n`;
+        // A query para buscar o nome do cargo foi removida para evitar erros caso a tabela não exista,
+        // e substituída pela menção direta do cargo, que é mais confiável.
+        tagList += `\`[${t.tag}]\` - Cargo: <@&${t.role_id}>\n`;
     }
     embed.addFields({ name: 'Tags Configuradas', value: tagList });
   } else {
@@ -401,7 +403,7 @@ async function getTagsMenuPayload(db) {
   return { embeds: [embed], components: [buttons] };
 }
 
-
+// CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
 module.exports = {
   getMainMenuPayload,
   getCopomMenuPayload,
@@ -411,6 +413,7 @@ module.exports = {
   getCorregedoriaMenuPayload,
   getCorregedoriaPunishmentsMenuPayload,
   getDecorationsMenuPayload,
+  getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
-  getDecorationsManageMedalsPayload
+  getTagsMenuPayload
 };
