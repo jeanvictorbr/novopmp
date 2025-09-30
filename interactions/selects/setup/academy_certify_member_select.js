@@ -54,18 +54,21 @@ async function sendCertificationNotification(interaction, member, course) {
 module.exports = {
     customId: (customId) => customId.startsWith('academy_certify_member_select'),
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        // CORREÇÃO: Usar deferUpdate() para indicar que a mensagem original será atualizada.
+        await interaction.deferUpdate();
+        
         const userId = interaction.values[0];
         const courseId = interaction.customId.split('_').pop();
-        const certifiedBy = interaction.user.id; // CAPTURA O ID DE QUEM ESTÁ USANDO O MENU
+        const certifiedBy = interaction.user.id;
 
         try {
             const course = await db.get('SELECT * FROM academy_courses WHERE course_id = $1', [courseId]);
-            if (!course) return await interaction.editReply('❌ Curso não encontrado.');
+            if (!course) {
+                return await interaction.followUp({ content: '❌ Curso não encontrado.', ephemeral: true });
+            }
 
             await db.run('DELETE FROM academy_enrollments WHERE user_id = $1 AND course_id = $2', [userId, courseId]);
             
-            // CORREÇÃO: Adiciona o 'certified_by' no comando SQL.
             await db.run(
                 'INSERT INTO user_certifications (user_id, course_id, completion_date, certified_by) VALUES ($1, $2, $3, $4)',
                 [userId, courseId, Math.floor(Date.now() / 1000), certifiedBy]
@@ -78,15 +81,19 @@ module.exports = {
             }
 
             await sendCertificationNotification(interaction, member, course);
-            await interaction.editReply(`✅ <@${userId}> certificado(a) e notificado(a) com sucesso!`);
+
+            // CORREÇÃO: Usar followUp() para enviar a confirmação privada.
+            await interaction.followUp({ content: `✅ <@${userId}> certificado(a) e notificado(a) com sucesso!`, ephemeral: true });
             
             const updatedEnrollments = await db.all('SELECT * FROM academy_enrollments WHERE course_id = $1', [courseId]);
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(course, interaction.guild, updatedEnrollments);
+            
+            // CORREÇÃO: Esta linha agora funcionará corretamente.
             await interaction.message.edit(updatedDashboard);
 
         } catch (error) {
             console.error("Erro ao certificar oficial:", error);
-            await interaction.editReply('❌ Ocorreu um erro ao certificar o oficial.');
+            await interaction.followUp({ content: '❌ Ocorreu um erro ao certificar o oficial.', ephemeral: true });
         }
     },
 };
