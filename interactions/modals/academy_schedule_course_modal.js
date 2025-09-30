@@ -13,7 +13,9 @@ module.exports = {
 
     try {
       const course = await db.get('SELECT * FROM academy_courses WHERE course_id = $1', [courseId]);
-      if (!course) return await interaction.editReply('❌ O ID do curso fornecido não foi encontrado.');
+      if (!course) {
+        return await interaction.editReply('❌ O ID do curso fornecido não foi encontrado.');
+      }
       
       const [day, month, year] = dateString.split('/').map(Number);
       const [hour, minute] = timeString.split(':').map(Number);
