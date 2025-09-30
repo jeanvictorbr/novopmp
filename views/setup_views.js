@@ -415,40 +415,35 @@ async function getEnlistmentMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'enlistment_%' OR key = 'recruiter_role_id'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
 
-  const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes");
-  const activeQuizId = settingsMap.get('enlistment_quiz_id');
-  const activeQuiz = quizzes.find(q => q.quiz_id.toString() === activeQuizId);
-
   const embed = new EmbedBuilder()
     .setColor('White')
     .setTitle('🗂️ Configuração do Módulo de Alistamento')
-    .setDescription('Configure cada etapa do processo de recrutamento, desde o painel público até a prova teórica opcional.')
+    .setDescription('Configure os canais e cargos para o novo fluxo de recrutamento: **Prova Teórica ➔ Formulário ➔ Aprovação Final**.')
     .setImage(SETUP_EMBED_IMAGE_URL)
     .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
     .addFields(
-        { name: 'Canal do Painel Público', value: settingsMap.has('enlistment_public_channel_id') ? `✅ <#${settingsMap.get('enlistment_public_channel_id')}>` : '`❌ Não definido`', inline: true },
-        { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `✅ <#${settingsMap.get('enlistment_approval_channel_id')}>` : '`❌ Não definido`', inline: true },
-        { name: 'Canal de Logs', value: settingsMap.has('enlistment_logs_channel_id') ? `✅ <#${settingsMap.get('enlistment_logs_channel_id')}>` : '`❌ Não definido`', inline: true },
-        { name: 'Cargo de Recrutador', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true },
-        { name: 'Cargo de Alistado', value: settingsMap.has('enlistment_recruit_role_id') ? `✅ <@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`❌ Não definido`', inline: true },
-        { name: 'Banner do Painel', value: settingsMap.has('enlistment_banner_url') ? '✅ `Definido`' : '`❌ Não definido`', inline: true },
-        { name: 'Prova Teórica Ativa', value: activeQuiz ? `✅ \`${activeQuiz.title}\`` : '`❌ Desativada`', inline: false }
+        { name: '1. Canal de Provas (Público)', value: settingsMap.has('enlistment_quiz_channel_id') ? `✅ <#${settingsMap.get('enlistment_quiz_channel_id')}>` : '`❌ Não definido`', inline: true },
+        { name: '2. Cargo Pós-Prova', value: settingsMap.has('enlistment_quiz_passed_role_id') ? `✅ <@&${settingsMap.get('enlistment_quiz_passed_role_id')}>` : '`❌ Não definido`', inline: true },
+        { name: '3. Canal de Alistamento (Restrito)', value: settingsMap.has('enlistment_form_channel_id') ? `✅ <#${settingsMap.get('enlistment_form_channel_id')}>` : '`❌ Não definido`', inline: true },
+        { name: '4. Canal de Aprovações (Recrutadores)', value: settingsMap.has('enlistment_approval_channel_id') ? `✅ <#${settingsMap.get('enlistment_approval_channel_id')}>` : '`❌ Não definido`', inline: true },
+        { name: '5. Cargo de Recruta (Final)', value: settingsMap.has('enlistment_recruit_role_id') ? `✅ <@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`❌ Não definido`', inline: true },
+        { name: 'Cargo de Recrutador (Staff)', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true }
     );
   
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('enlistment_setup_set_public_channel').setLabel('Canal Público').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('enlistment_setup_set_approval_channel').setLabel('Canal Aprovações').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('enlistment_setup_set_logs_channel').setLabel('Canal de Logs').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_channel').setLabel('Canal de Provas').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_passed_role').setLabel('Cargo Pós-Prova').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_setup_set_form_channel').setLabel('Canal de Alistamento').setStyle(ButtonStyle.Secondary)
   );
   
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('enlistment_setup_set_recruiter_role').setLabel('Cargo Recrutador').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('enlistment_setup_set_recruit_role').setLabel('Cargo Alistado').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('enlistment_setup_set_banner').setLabel('Definir Banner').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('enlistment_setup_set_approval_channel').setLabel('Canal Aprovações').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_setup_set_recruit_role').setLabel('Cargo Recruta').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_setup_set_recruiter_role').setLabel('Cargo Recrutador').setStyle(ButtonStyle.Secondary)
   );
 
   const row3 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('enlistment_setup_manage_quiz').setLabel('Gerir Prova Teórica').setStyle(ButtonStyle.Primary).setEmoji('✍️'),
+      new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel('Criar e Gerir Provas').setStyle(ButtonStyle.Primary).setEmoji('✍️'),
       new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
   );
 
