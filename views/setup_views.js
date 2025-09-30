@@ -34,6 +34,12 @@ async function getMainMenuPayload() {
         emoji: '⚖️',
       },
       {
+        label: 'Módulo Registros',
+        description: 'Gerencie a ficha de registro de cada oficial.',
+        value: 'module_records',
+        emoji: '📇',
+      },
+      {
         label: 'Módulo Carreira',
         description: 'Gerencie promoções, medalhas e a carreira dos oficiais.',
         value: 'module_decorations',
@@ -405,6 +411,26 @@ async function getTagsMenuPayload(db, guild) {
 
   return { embeds: [embed], components: [buttons, syncButton] };
 }
+async function getRecordsMenuPayload(db) {
+  const settings = await db.get("SELECT value FROM settings WHERE key = 'records_public_channel_id'");
+  const embed = new EmbedBuilder()
+    .setColor('White')
+    .setTitle('📇 Configuração do Módulo de Registros')
+    .setDescription('Gerencie os registros de oficiais e configure a prova teórica de ingresso.')
+    .setImage(SETUP_EMBED_IMAGE_URL)
+    .addFields({ name: 'Canal Público de Consulta', value: settings ? `<#${settings.value}>` : '`Não definido`' })
+    .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+  
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('records_create_edit').setLabel('Criar / Editar Registro').setStyle(ButtonStyle.Success).setEmoji('📝'),
+    new ButtonBuilder().setCustomId('records_manage_test').setLabel('Gerenciar Prova Teórica').setStyle(ButtonStyle.Primary).setEmoji('❓').setDisabled(true) // Desabilitado por enquanto
+  );
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('records_set_public_channel').setLabel('Definir Canal Público').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
+  );
+  return { embeds: [embed], components: [row1, row2] };
+}
 
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
@@ -417,6 +443,7 @@ module.exports = {
   getCorregedoriaMenuPayload,
   getCorregedoriaPunishmentsMenuPayload,
   getDecorationsMenuPayload,
+  getRecordsMenuPayload,
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
   getTagsMenuPayload,

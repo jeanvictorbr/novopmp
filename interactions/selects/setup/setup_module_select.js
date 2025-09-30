@@ -1,4 +1,4 @@
-const { getCopomMenuPayload, getAcademyMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload, getHierarchyMenuPayload, getTagsMenuPayload } = require('../../../views/setup_views.js');
+const { getCopomMenuPayload, getAcademyMenuPayload, getRecordsMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload, getHierarchyMenuPayload, getTagsMenuPayload } = require('../../../views/setup_views.js');
 const db = require('../../../database/db.js');
 
 module.exports = {
@@ -20,6 +20,8 @@ module.exports = {
         payload = await getDecorationsMenuPayload(db);
       } else if (selectedModule === 'module_hierarchy') {
         payload = await getHierarchyMenuPayload(db);
+      } else if (selectedModule === 'module_records') { // Adicione este bloco
+        payload = await getRecordsMenuPayload(db);
       } else if (selectedModule === 'module_tags') {
         // CORREÇÃO: Passa o objeto 'interaction.guild' para a função.
         payload = await getTagsMenuPayload(db, interaction.guild);
