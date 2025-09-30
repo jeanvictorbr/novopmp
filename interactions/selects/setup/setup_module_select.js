@@ -20,8 +20,9 @@ module.exports = {
         payload = await getDecorationsMenuPayload(db);
       } else if (selectedModule === 'module_hierarchy') {
         payload = await getHierarchyMenuPayload(db);
-      } else if (selectedModule === 'module_tags') { // NOVA ALTERAÇÃO ADICIONADA AQUI
-        payload = await getTagsMenuPayload(db);
+      } else if (selectedModule === 'module_tags') {
+        // CORREÇÃO: Passa o objeto 'interaction.guild' para a função.
+        payload = await getTagsMenuPayload(db, interaction.guild);
       } else {
         return await interaction.editReply({ content: '❌ Módulo não encontrado.', components: [] });
       }
