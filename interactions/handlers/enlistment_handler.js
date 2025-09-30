@@ -100,10 +100,27 @@ const enlistmentHandler = {
         const candidate = await interaction.guild.members.fetch(request.user_id).catch(() => null);
         const embedColor = isApproved ? 'Green' : 'Red';
         const embedTitle = isApproved ? '🎉 Alistamento Aprovado!' : '❌ Alistamento Recusado';
-        const embedDescription = isApproved 
+        let embedDescription = isApproved 
             ? 'Parabéns! O seu pedido de alistamento foi aprovado. Apresente-se no local designado para iniciar o seu treinamento.'
             : 'O seu pedido de alistamento foi recusado. Você pode tentar novamente no futuro.';
 
+        // LÓGICA ADICIONADA AQUI
+        if (isApproved && candidate) {
+            const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
+            if (recruitRoleId) {
+                try {
+                    const role = await interaction.guild.roles.fetch(recruitRoleId);
+                    if (role) {
+                        await candidate.roles.add(role);
+                        embedDescription += `\n\nVocê recebeu o cargo **${role.name}**.`;
+                    }
+                } catch (err) {
+                    console.error("Erro ao dar cargo de alistado:", err);
+                    interaction.followUp({ content: `⚠️ Não foi possível entregar o cargo de alistado para ${candidate.toString()}. Verifique minhas permissões.`, ephemeral: true });
+                }
+            }
+        }
+        
         if (candidate) {
             try {
                 const dmEmbed = new EmbedBuilder().setColor(embedColor).setTitle(embedTitle).setDescription(embedDescription).setFooter({ text: `Analisado por: ${interaction.user.tag}` });

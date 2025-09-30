@@ -412,21 +412,25 @@ async function getTagsMenuPayload(db, guild) {
   return { embeds: [embed], components: [buttons, syncButton] };
 }
 async function getEnlistmentMenuPayload(db) {
-  const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'enlistment_%' OR key = 'recruiter_role_id'");
+  const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'enlistment_%' OR key = 'recruiter_role_id' OR key = 'enlistment_recruit_role_id'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
   const embed = new EmbedBuilder()
     .setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento')
     .addFields(
         { name: 'Canal do Painel Público', value: settingsMap.has('enlistment_public_channel_id') ? `<#${settingsMap.get('enlistment_public_channel_id')}>` : '`Não definido`' },
         { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `<#${settingsMap.get('enlistment_approval_channel_id')}>` : '`Não definido`' },
-        { name: 'Cargo de Recrutador', value: settingsMap.has('recruiter_role_id') ? `<@&${settingsMap.get('recruiter_role_id')}>` : '`Não definido`' }
+        { name: 'Cargo de Recrutador', value: settingsMap.has('recruiter_role_id') ? `<@&${settingsMap.get('recruiter_role_id')}>` : '`Não definido`' },
+        { name: 'Cargo de Alistado (Pós-Aprovação)', value: settingsMap.has('enlistment_recruit_role_id') ? `<@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`Não definido`' }
     );
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('enlistment_set_public_channel').setLabel('Definir Canal Público').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('enlistment_set_approval_channel').setLabel('Definir Canal Aprovação').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('enlistment_set_recruiter_role').setLabel('Definir Cargo Recrutador').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [row, new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger))] };
+   const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('enlistment_set_recruiter_role').setLabel('Definir Cargo Recrutador').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('enlistment_set_recruit_role').setLabel('Definir Cargo Alistado').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [row1, row2, new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger))] };
 }
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.
