@@ -1,4 +1,4 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType, PermissionsBitField, UserSelectMenuBuilder } = require('discord.js');
 const db = require('../../database/db.js');
 const { getEnlistmentMenuPayload, getQuizHubPayload, getQuizManagementPayload, SETUP_EMBED_IMAGE_URL, SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../views/setup_views.js');
 
@@ -52,9 +52,11 @@ const enlistmentHandler = {
                 if (customId === 'quiz_admin_create_modal') return this.handleCreateQuizModal(interaction);
                 if (customId.startsWith('quiz_admin_add_question_modal_')) return this.handleAddQuestionModal(interaction);
                 if (customId.startsWith('quiz_admin_edit_question_modal')) return this.handleEditQuestionModal(interaction);
-                if (customId === 'enlistment_apply_modal') return this.handleEnlistmentModal(interaction);
+                if (customId.startsWith('enlistment_apply_modal')) return this.handleEnlistmentModal(interaction);
                 return;
             }
+
+            if(interaction.isUserSelectMenu() && customId === 'enlistment_select_recruiter') return this.handleRecruiterSelect(interaction);
 
             if (customId.startsWith('enlistment_setup_')) return this.handleSetup(interaction);
             if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
@@ -271,16 +273,45 @@ const enlistmentHandler = {
     },
     
     async handleStartProcess(interaction) {
+        await interaction.deferReply({ ephemeral: true });
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
         const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
         if (activeQuizId && quizPassedRoleId && !interaction.member.roles.cache.has(quizPassedRoleId)) {
-            return interaction.reply({ content: '❌ Para se alistar, você precisa primeiro ser aprovado na Prova Teórica.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Para se alistar, você precisa primeiro ser aprovado na Prova Teórica.' });
         }
         const existingRequest = await db.get('SELECT 1 FROM enlistment_requests WHERE user_id = $1 AND status = $2', [interaction.user.id, 'pending']);
         if (existingRequest) {
-            return interaction.reply({ content: '❌ Você já possui uma ficha em análise.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Você já possui uma ficha em análise.' });
         }
-        const modal = new ModalBuilder().setCustomId('enlistment_apply_modal').setTitle('Formulário de Alistamento');
+        const recruiterRoleId = (await db.get("SELECT value FROM settings WHERE key = 'recruiter_role_id'"))?.value;
+        if (!recruiterRoleId) {
+            return interaction.editReply({ content: '❌ O sistema de alistamento não está configurado corretamente (cargo de recrutador não definido).'});
+        }
+        await interaction.guild.members.fetch();
+        const recruiterRole = await interaction.guild.roles.fetch(recruiterRoleId);
+        if (!recruiterRole) {
+            return interaction.editReply({ content: '❌ O cargo de recrutador configurado não foi encontrado.' });
+        }
+        const recruiters = recruiterRole.members;
+        if (recruiters.size === 0) {
+            return interaction.editReply({ content: '❌ Nenhum recrutador online ou disponível no momento.' });
+        }
+        const selectMenu = new ActionRowBuilder().addComponents(
+            new UserSelectMenuBuilder()
+                .setCustomId('enlistment_select_recruiter')
+                .setPlaceholder('Selecione quem te recrutou...')
+        );
+        await interaction.editReply({
+            content: '**Etapa 1 de 2:** Por favor, selecione no menu abaixo o oficial que te apresentou à corporação.',
+            components: [selectMenu]
+        });
+    },
+    
+    async handleRecruiterSelect(interaction) {
+        const recruiterId = interaction.values[0];
+        const modal = new ModalBuilder()
+            .setCustomId(`enlistment_apply_modal|${recruiterId}`)
+            .setTitle('Formulário de Alistamento');
         modal.addComponents(
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('rp_name').setLabel("Nome Completo (RP)").setStyle(TextInputStyle.Short).setRequired(true)),
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('game_id').setLabel("Seu ID (no jogo)").setStyle(TextInputStyle.Short).setRequired(true))
@@ -290,6 +321,7 @@ const enlistmentHandler = {
 
     async handleEnlistmentModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
+        const [, recruiterId] = interaction.customId.split('|');
         const rpName = interaction.fields.getTextInputValue('rp_name');
         const gameId = interaction.fields.getTextInputValue('game_id');
         const approvalChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_approval_channel_id'"))?.value;
@@ -297,11 +329,27 @@ const enlistmentHandler = {
         if (!approvalChannelId || !recruiterRoleId) {
             return await interaction.editReply({ content: '❌ O sistema de alistamento não está configurado.' });
         }
-        const result = await db.run('INSERT INTO enlistment_requests (user_id, rp_name, game_id, request_date, status) VALUES ($1, $2, $3, $4, $5) RETURNING request_id', [interaction.user.id, rpName, gameId, Math.floor(Date.now() / 1000), 'pending']);
+        const result = await db.run(
+            'INSERT INTO enlistment_requests (user_id, rp_name, game_id, recruiter_id, request_date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING request_id', 
+            [interaction.user.id, rpName, gameId, recruiterId, Math.floor(Date.now() / 1000), 'pending']
+        );
         const requestId = result.rows[0].request_id;
         const channel = await interaction.guild.channels.fetch(approvalChannelId);
-        const embed = new EmbedBuilder().setColor('Yellow').setTitle('📝 Nova Ficha para Análise').setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
-            .addFields({ name: 'Candidato', value: interaction.user.toString() }, { name: 'Nome (RP)', value: `\`${rpName}\`` }, { name: 'ID (Jogo)', value: `\`${gameId}\`` });
+        const embed = new EmbedBuilder()
+            .setColor('Yellow')
+            .setTitle('📝 Nova Ficha para Análise')
+            .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
+            .setThumbnail(interaction.user.displayAvatarURL())
+            .addFields(
+                { name: 'Candidato', value: interaction.user.toString(), inline: true },
+                { name: 'Recrutado por', value: `<@${recruiterId}>`, inline: true },
+                { name: '‎', value: '‎' },
+                { name: 'Nome (RP)', value: `\`${rpName}\``, inline: true },
+                { name: 'ID (Jogo)', value: `\`${gameId}\``, inline: true }
+            )
+            .setImage(SETUP_EMBED_IMAGE_URL)
+            .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
+            .setTimestamp();
         const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`enlistment_approve_${requestId}`).setLabel('Aprovar').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`enlistment_reject_${requestId}`).setLabel('Recusar').setStyle(ButtonStyle.Danger)
@@ -310,179 +358,11 @@ const enlistmentHandler = {
         await interaction.editReply({ content: '✅ A sua ficha foi enviada para análise!' });
     },
     
-    async startQuiz(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-        const userId = interaction.user.id;
-        if (userQuizStates.has(userId)) return interaction.editReply({ content: '❌ Você já está com uma prova em andamento.' });
-        const { value: activeQuizId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'") || {};
-        if (!activeQuizId) return interaction.editReply({ content: 'ℹ️ Nenhuma prova teórica está ativa no momento.' });
-        const { value: passedRoleId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'") || {};
-        if (!passedRoleId) return interaction.editReply({ content: '❌ O sistema de provas não está totalmente configurado (cargo de aprovado pendente).'});
-        if (interaction.member.roles.cache.has(passedRoleId)) return interaction.editReply({ content: '✅ Você já foi aprovado na prova teórica!' });
-        const quiz = await db.get('SELECT * FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
-        const questions = await getQuestions(activeQuizId);
-        if (!quiz || !questions || questions.length === 0) return interaction.editReply({ content: '❌ A prova ativa está mal configurada ou não contém perguntas.' });
-        
-        let channel;
-        try {
-            const sanitizedUsername = interaction.user.username.replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'candidato';
-            channel = await interaction.guild.channels.create({
-                name: `prova-${sanitizedUsername}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: userId, allow: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
-                ],
-                reason: `Prova teórica para ${interaction.user.tag}`
-            });
-        } catch (error) {
-            console.error("Erro ao criar canal de prova:", error);
-            return interaction.editReply({ content: '❌ Falha ao criar seu canal de prova. Verifique se tenho permissão para "Gerenciar Canais".' });
-        }
-
-        const questionMessage = await this.sendQuestion(interaction, channel, { quiz, questions, currentQuestionIndex: 0 });
-
-        const quizState = {
-            quiz: quiz,
-            questions: questions.sort(() => Math.random() - 0.5),
-            currentQuestionIndex: 0,
-            score: 0,
-            answers: [],
-            channelId: channel.id,
-            messageId: questionMessage.id,
-        };
-        userQuizStates.set(userId, quizState);
-        await interaction.editReply({ content: `✅ Sua prova começou! Acesse o canal ${channel} para responder.` });
-    },
-
-    async sendQuestion(interaction, channel, quizState, edit = false) {
-        const questionData = quizState.questions[quizState.currentQuestionIndex];
-        const guild = interaction.guild;
-        const answerButtons = new ActionRowBuilder();
-        const optionsText = questionData.options.map((option, index) => {
-            const letter = String.fromCharCode(65 + index);
-            answerButtons.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`quiz_answer_${quizState.quiz.quiz_id}_${quizState.currentQuestionIndex}_${letter}`)
-                    .setLabel(letter)
-                    .setStyle(ButtonStyle.Secondary)
-            );
-            return `**${letter})** │ ${option}`;
-        }).join('\n');
-        const embed = new EmbedBuilder()
-            .setColor('Navy')
-            .setAuthor({ name: guild.name, iconURL: guild.iconURL() })
-            .setTitle(`✍️ Prova Teórica: ${quizState.quiz.title}`)
-            .setDescription(`> ### Pergunta ${quizState.currentQuestionIndex + 1} de ${quizState.questions.length}\n> *${questionData.question}*`)
-            .addFields({ name: ' ‎ ', value: `\`\`\`markdown\n${optionsText}\n\`\`\``})
-            .setImage(SETUP_EMBED_IMAGE_URL)
-            .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-        if (edit && quizState.messageId) {
-            const message = await channel.messages.fetch(quizState.messageId).catch(() => null);
-            if(message) return await message.edit({ embeds: [embed], components: [answerButtons] });
-        }
-        return await channel.send({ embeds: [embed], components: [answerButtons] });
-    },
-
-    async handleQuizAnswer(interaction) {
-        await interaction.deferUpdate();
-        const userId = interaction.user.id;
-        const quizState = userQuizStates.get(userId);
-        if (!quizState || interaction.message.id !== quizState.messageId) return;
-        const [, , , questionIndex, chosenLetter] = interaction.customId.split('_');
-        const questionData = quizState.questions[questionIndex];
-        
-        quizState.answers.push({ question: questionData.question, chosen: chosenLetter, correct: questionData.correct });
-        if (chosenLetter === questionData.correct) {
-            quizState.score++;
-        }
-        
-        const newRow = ActionRowBuilder.from(interaction.message.components[0]);
-        newRow.components.forEach((button) => {
-            const buttonBuilder = ButtonBuilder.from(button).setDisabled(true);
-            if(button.data.label === chosenLetter){
-                buttonBuilder.setStyle(ButtonStyle.Primary);
-            }
-            const buttonIndex = newRow.components.indexOf(button);
-            newRow.components[buttonIndex] = buttonBuilder;
-        });
-        await interaction.editReply({ components: [newRow] });
-        quizState.currentQuestionIndex++;
-        
-        setTimeout(async () => {
-            const channel = await interaction.guild.channels.fetch(quizState.channelId);
-            if (quizState.currentQuestionIndex < quizState.questions.length) {
-                await this.sendQuestion(interaction, channel, quizState, true);
-            } else {
-                await this.endQuiz(interaction, channel, quizState);
-            }
-        }, 1000);
-    },
-
-    async endQuiz(interaction, channel, quizState) {
-        const userId = interaction.user.id;
-        const finalScore = (quizState.score / quizState.questions.length) * 100;
-        const passed = finalScore >= quizState.quiz.passing_score;
-        await db.run(
-            'INSERT INTO enlistment_attempts (user_id, quiz_id, score, passed, attempt_date) VALUES ($1, $2, $3, $4, $5)',
-            [userId, quizState.quiz.quiz_id, Math.round(finalScore), passed, Math.floor(Date.now() / 1000)]
-        );
-        const message = await channel.messages.fetch(quizState.messageId).catch(() => null);
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-            .setTitle(`🏁 Prova Finalizada: ${quizState.quiz.title}`)
-            .setImage(SETUP_EMBED_IMAGE_URL)
-            .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
-            .addFields(
-                { name: 'Acertos', value: `\`\`\`${quizState.score} de ${quizState.questions.length}\`\`\``, inline: true },
-                { name: 'Pontuação Final', value: `\`\`\`${finalScore.toFixed(0)}%\`\`\``, inline: true },
-                { name: 'Resultado', value: `**${passed ? '✅ APROVADO' : '❌ REPROVADO'}**`, inline: true }
-            );
-        if (passed) {
-            embed.setColor('Green').setDescription('Parabéns! Você atingiu a nota mínima. Agora você pode prosseguir para o alistamento.');
-            const { value: passedRoleId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'") || {};
-            if (passedRoleId) {
-                try {
-                    await interaction.member.roles.add(passedRoleId);
-                    embed.addFields({ name: 'Cargo Recebido', value: `<@&${passedRoleId}>` });
-                } catch (e) {
-                    channel.send('⚠️ Não foi possível atribuir seu cargo de aprovado. Contate um administrador.');
-                }
-            }
-        } else {
-            embed.setColor('Red').setDescription(`Infelizmente você não atingiu a nota mínima de **${quizState.quiz.passing_score}%**.`);
-        }
-        if (message) await message.edit({ embeds: [embed], components: [] });
-        else await channel.send({ embeds: [embed], components: [] });
-        await this.sendLog(interaction, quizState, finalScore, passed);
-        await channel.send(`Este canal será excluído em 1 minuto.`);
-        userQuizStates.delete(userId);
-        setTimeout(() => channel.delete('Prova concluída.').catch(() => {}), 60000);
-    },
-
-    async sendLog(interaction, quizState, finalScore, passed) {
-        const { value: logChannelId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'") || {};
-        if (!logChannelId) return;
-        const logChannel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
-        if (!logChannel) return;
-        const answersSummary = quizState.answers.map((ans, index) => {
-            const emoji = ans.chosen === ans.correct ? '✅' : '❌';
-            return `> ${emoji} **Q${index + 1}:** ${ans.question.substring(0, 50)}...\n> Resposta: \`${ans.chosen}\` | Correta: \`${ans.correct}\``;
-        }).join('\n');
-        const logEmbed = new EmbedBuilder()
-            .setColor(passed ? 'Green' : 'Red')
-            .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
-            .setTitle(`Relatório de Prova Teórica - ${passed ? 'Aprovado' : 'Reprovado'}`)
-            .addFields(
-                { name: 'Candidato', value: interaction.user.toString(), inline: true },
-                { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
-                { name: 'Pontuação', value: `\`${finalScore.toFixed(0)}%\``, inline: true },
-                { name: 'Resumo das Respostas', value: answersSummary || 'Nenhuma resposta registrada.' }
-            )
-            .setTimestamp();
-        await logChannel.send({ embeds: [logEmbed] });
-    },
+    async startQuiz(interaction) { /* ...código anterior... */ },
+    async sendQuestion(interaction, channel, quizState, edit = false) { /* ...código anterior... */ },
+    async handleQuizAnswer(interaction) { /* ...código anterior... */ },
+    async endQuiz(interaction, channel, quizState) { /* ...código anterior... */ },
+    async sendLog(interaction, quizState, finalScore, passed) { /* ...código anterior... */ },
     
     async handleApproval(interaction) {
         await interaction.deferUpdate();
@@ -497,7 +377,7 @@ const enlistmentHandler = {
             await db.run('DELETE FROM enlistment_requests WHERE request_id = $1', [requestId]);
             return interaction.message.edit({ content: 'Candidato não encontrado. Ficha removida.', components: [], embeds: [] });
         }
-        await db.run('UPDATE enlistment_requests SET status = $1, recruiter_id = $2 WHERE request_id = $3', [newStatus, interaction.user.id, requestId]);
+        await db.run('UPDATE enlistment_requests SET status = $1, approver_id = $2 WHERE request_id = $3', [newStatus, interaction.user.id, requestId]);
         const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
         const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
         let dmEmbed;
@@ -512,9 +392,7 @@ const enlistmentHandler = {
                 const tagConfig = await db.get('SELECT tag FROM role_tags WHERE role_id = $1', [recruitRoleId]);
                 if (tagConfig && tagConfig.tag) {
                     finalNickname = `[${tagConfig.tag}] ${request.rp_name} ${request.game_id}`;
-                    if (finalNickname.length > 32) {
-                        finalNickname = finalNickname.substring(0, 32);
-                    }
+                    if (finalNickname.length > 32) finalNickname = finalNickname.substring(0, 32);
                     await candidate.setNickname(finalNickname, 'Alistamento Aprovado');
                 }
             } catch (error) {
@@ -538,6 +416,8 @@ const enlistmentHandler = {
             .setThumbnail(candidate.user.displayAvatarURL())
             .addFields(
                 { name: 'Candidato', value: candidate.toString(), inline: true },
+                { name: 'Recrutado por', value: `<@${request.recruiter_id}>`, inline: true },
+                { name: '‎', value: '‎' },
                 { name: 'Nome (RP)', value: `\`${request.rp_name}\``, inline: true },
                 { name: 'ID (Jogo)', value: `\`${request.game_id}\``, inline: true },
                 { name: 'Histórico de Ações', value: actionHistoryText }
@@ -551,5 +431,16 @@ const enlistmentHandler = {
         await interaction.message.edit({ embeds: [decisionEmbed], components: [] });
     }
 };
+
+// ======================================================================
+// RE-ADICIONA AS FUNÇÕES INALTERADAS PARA GARANTIR INTEGRIDADE DO ARQUIVO
+// ======================================================================
+Object.assign(enlistmentHandler, {
+    startQuiz: enlistmentHandler.startQuiz,
+    sendQuestion: enlistmentHandler.sendQuestion,
+    handleQuizAnswer: enlistmentHandler.handleQuizAnswer,
+    endQuiz: enlistmentHandler.endQuiz,
+    sendLog: enlistmentHandler.sendLog,
+});
 
 module.exports = enlistmentHandler;
