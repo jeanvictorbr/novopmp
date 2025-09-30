@@ -18,53 +18,19 @@ async function getMainMenuPayload() {
     .setCustomId('setup_module_select')
     .setPlaceholder('Escolha um módulo...')
     .addOptions([
-      {
-        label: 'Módulo COPOM',
-        description: 'Configure canais, cargos e equipes para o controle de patrulha.',
-        value: 'module_copom',
-        emoji: '👮',
-      },
-      {
-        label: 'Módulo Academia',
-        description: 'Gerencie cursos, certificações e instrutores.',
-        value: 'module_academy',
-        emoji: '🎓',
-      },
-      {
-        label: 'Módulo Corregedoria',
-        description: 'Gerencie denúncias, investigações e sanções internas.',
-        value: 'module_corregedoria',
-        emoji: '⚖️',
-      },
-      {
-        label: 'Módulo Alistamento',
-        description: 'Gerencie o painel de alistamento e o canal de aprovações.',
-        value: 'module_enlistment',
-        emoji: '🗂️',
-      },
-      {
-        label: 'Módulo Carreira',
-        description: 'Gerencie promoções, medalhas e a carreira dos oficiais.',
-        value: 'module_decorations',
-        emoji: '🏆',
-      },
-      {
-        label: 'Módulo Hierarquia',
-        description: 'Configure uma vitrine de cargos que se atualiza sozinha.',
-        value: 'module_hierarchy',
-        emoji: '📊',
-      },
-      {
-        label: 'Módulo Tags Policiais',
-        description: 'Gerencie os nicks e tags automáticas dos cargos.',
-        value: 'module_tags',
-        emoji: '🏷️',
-      },
+      { label: 'Módulo COPOM', description: 'Configure canais, cargos e equipes para o controle de patrulha.', value: 'module_copom', emoji: '👮' },
+      { label: 'Módulo Academia', description: 'Gerencie cursos, certificações e instrutores.', value: 'module_academy', emoji: '🎓' },
+      { label: 'Módulo Corregedoria', description: 'Gerencie denúncias, investigações e sanções internas.', value: 'module_corregedoria', emoji: '⚖️' },
+      { label: 'Módulo Alistamento', description: 'Gerencie o painel de alistamento e o canal de aprovações.', value: 'module_enlistment', emoji: '🗂️' },
+      { label: 'Módulo Carreira', description: 'Gerencie promoções, medalhas e a carreira dos oficiais.', value: 'module_decorations', emoji: '🏆' },
+      { label: 'Módulo Hierarquia', description: 'Configure uma vitrine de cargos que se atualiza sozinha.', value: 'module_hierarchy', emoji: '📊' },
+      { label: 'Módulo Tags Policiais', description: 'Gerencie os nicks e tags automáticas dos cargos.', value: 'module_tags', emoji: '🏷️' },
     ]);
   const row = new ActionRowBuilder().addComponents(selectMenu);
   return { embeds: [embed], components: [row] };
 }
 
+// ... (todas as outras funções como getCopomMenuPayload, getAcademyMenuPayload, etc., permanecem inalteradas)
 async function getCopomMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'copom_%' OR key = 'em_servico_role_id'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
@@ -186,7 +152,6 @@ async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
     .setDescription('Aprove ou recuse os oficiais inscritos no curso.')
     .setImage(SETUP_EMBED_IMAGE_URL)
     .setFooter({ text: 'Certifique apenas os oficiais que completaram o curso.', iconURL: SETUP_FOOTER_ICON_URL });
-
   const options = await Promise.all(enrollments.map(async (e) => {
     const member = await guild.members.fetch(e.user_id).catch(() => null);
     if (!member) return null;
@@ -196,32 +161,25 @@ async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
       value: e.user_id,
     };
   }));
-
   const validOptions = options.filter(Boolean);
-
   if (validOptions.length === 0) {
     embed.setDescription('Nenhum oficial inscrito neste curso no momento.');
   }
-
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId(`academy_certify_member_select_${course.course_id}`)
     .setPlaceholder('Selecione um oficial para certificar...')
     .addOptions(validOptions.length > 0 ? validOptions : [{ label: 'Nenhum inscrito', value: 'none', disabled: true }]);
-
   const approveAllButton = new ButtonBuilder()
     .setCustomId(`academy_certify_all_${course.course_id}`)
     .setLabel('Aprovar Todos')
     .setStyle(ButtonStyle.Success)
     .setEmoji('✅')
     .setDisabled(validOptions.length === 0);
-
   const actionRow = new ActionRowBuilder().addComponents(selectMenu);
-  
   const buttonRow = new ActionRowBuilder().addComponents(
     approveAllButton,
     new ButtonBuilder().setCustomId('back_to_academy_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
-
   return { embeds: [embed], components: [actionRow, buttonRow] };
 }
 
@@ -445,23 +403,27 @@ async function getEnlistmentMenuPayload(db) {
             activeQuiz = null;
         }
     }
-    const embed = new EmbedBuilder().setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento').setDescription('Configure os canais e cargos para o processo de recrutamento. A prova teórica é opcional.').setImage(SETUP_EMBED_IMAGE_URL).setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
+    const embed = new EmbedBuilder().setColor('White').setTitle('🗂️ Configuração do Módulo de Alistamento').setDescription('Configure os canais e cargos para o processo de recrutamento.').setImage(SETUP_EMBED_IMAGE_URL).setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
         .addFields(
             { name: 'Prova Teórica Ativa (Opcional)', value: activeQuiz ? `✅ \`${activeQuiz.title}\`` : '`❌ Desativada`', inline: false },
             { name: 'Cargo Pós-Prova (se ativa)', value: settingsMap.has('enlistment_quiz_passed_role_id') ? `✅ <@&${settingsMap.get('enlistment_quiz_passed_role_id')}>` : '`⚠️ Não definido`', inline: true },
             { name: 'Canal de Alistamento', value: settingsMap.has('enlistment_form_channel_id') ? `✅ <#${settingsMap.get('enlistment_form_channel_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `✅ <#${settingsMap.get('enlistment_approval_channel_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Cargo de Recruta (Final)', value: settingsMap.has('enlistment_recruit_role_id') ? `✅ <@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`❌ Não definido`', inline: true },
-            { name: 'Cargo de Recrutador (Staff)', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true }
+            { name: 'Cargo de Recrutador (Staff)', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true },
+            // NOVO CAMPO ADICIONADO AQUI
+            { name: 'Canal de Logs das Provas', value: settingsMap.has('enlistment_quiz_logs_channel_id') ? `✅ <#${settingsMap.get('enlistment_quiz_logs_channel_id')}>` : '`❌ Não definido`', inline: false }
         );
     const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('enlistment_setup_set_form_channel').setLabel('Canal de Alistamento').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('enlistment_setup_set_form_channel').setLabel('Canal Alistamento').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_approval_channel').setLabel('Canal Aprovações').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_recruiter_role').setLabel('Cargo Recrutador').setStyle(ButtonStyle.Secondary)
     );
     const row2 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_passed_role').setLabel('Cargo Pós-Prova').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_recruit_role').setLabel('Cargo Recruta').setStyle(ButtonStyle.Secondary),
+        // NOVO BOTÃO ADICIONADO AQUI
+        new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_logs_channel').setLabel('Logs das Provas').setStyle(ButtonStyle.Secondary)
     );
     const row3 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('enlistment_setup_manage_quizzes').setLabel('Ativar e Gerir Provas').setStyle(ButtonStyle.Primary).setEmoji('✍️'),
@@ -516,8 +478,6 @@ async function getQuizManagementPayload(db, quizId) {
     return { embeds: [embed], components };
 }
 
-// **AQUI ESTÁ A CORREÇÃO PRINCIPAL**
-// Adicionando as constantes ao objeto de exportação.
 module.exports = {
   getMainMenuPayload,
   getCopomMenuPayload,
