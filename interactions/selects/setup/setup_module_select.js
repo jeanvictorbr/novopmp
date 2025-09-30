@@ -1,4 +1,4 @@
-const { getCopomMenuPayload, getAcademyMenuPayload, getRecordsMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload, getHierarchyMenuPayload, getTagsMenuPayload } = require('../../../views/setup_views.js');
+const { getCopomMenuPayload, getAcademyMenuPayload, getRecordsMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload, getHierarchyMenuPayload, getTagsMenuPayload, getEnlistmentMenuPayload } = require('../../../views/setup_views.js');
 const db = require('../../../database/db.js');
 
 module.exports = {
