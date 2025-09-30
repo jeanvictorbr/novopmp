@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 require('dotenv-flow').config();
 
-// IMPORTAÇÃO DOS MÓDulos PRINCIPAIS
+// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
@@ -23,38 +23,35 @@ const client = new Client({
     ],
 });
 
+// Sistema de Handlers Unificado
 client.handlers = new Collection();
-client.functionHandlers = []; // Array para handlers com customId de função
 
 async function startBot() {
     await initializeDatabase();
-    loadHandlers('interactions'); // Carrega primeiro as interações para priorizar
-    loadHandlers('commands');
+    loadHandlers(path.join(__dirname, 'commands'));
+    loadHandlers(path.join(__dirname, 'interactions'));
     registerSlashCommands();
     client.login(DISCORD_TOKEN);
 }
 
 function loadHandlers(dir) {
-    const fullPath = path.join(__dirname, dir);
-    if (!fs.existsSync(fullPath)) return;
-    const files = fs.readdirSync(fullPath, { withFileTypes: true });
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir, { withFileTypes: true });
     for (const file of files) {
-        const filePath = path.join(fullPath, file.name);
+        const fullPath = path.join(dir, file.name);
         if (file.isDirectory()) {
-            loadHandlers(path.join(dir, file.name));
+            loadHandlers(fullPath);
         } else if (file.name.endsWith('.js')) {
-            const handler = require(filePath);
-            
-            // Lógica de registro aprimorada
-            if (typeof handler.customId === 'function') {
-                client.functionHandlers.push(handler);
-                console.log(`[INFO] Handler de Função Carregado: ${file.name}`);
-            } else {
-                const key = handler.customId || handler.data?.name;
+            try {
+                const handler = require(fullPath);
+                // A chave é o nome do comando (para /) ou uma função de verificação (para componentes)
+                const key = handler.data?.name || handler.customId;
                 if (key) {
                     client.handlers.set(key, handler);
-                    console.log(`[INFO] Handler Padrão Carregado: ${file.name} (key: ${key})`);
+                    console.log(`[INFO] Handler Carregado: ${file.name}`);
                 }
+            } catch (error) {
+                console.error(`[ERRO] Falha ao carregar o handler: ${file.name}`, error);
             }
         }
     }
@@ -63,18 +60,19 @@ function loadHandlers(dir) {
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
-        let handler;
+        let handler = null;
 
-        // 1. Procura primeiro por uma correspondência exata de ID (mais rápido)
-        handler = client.handlers.get(key);
-
-        // 2. Se não encontrar, procura nos handlers de função
-        if (!handler) {
-            for (const funcHandler of client.functionHandlers) {
-                if (funcHandler.customId(key)) {
-                    handler = funcHandler;
-                    break;
-                }
+        // Lógica de Roteamento Robusta
+        for (const [handlerKey, handlerValue] of client.handlers.entries()) {
+            // Se a chave for uma função (para customIds dinâmicos ou que usam .startsWith)
+            if (typeof handlerKey === 'function' && handlerKey(key)) {
+                handler = handlerValue;
+                break;
+            }
+            // Se a chave for uma string (para comandos / e customIds exatos)
+            if (typeof handlerKey === 'string' && handlerKey === key) {
+                handler = handlerValue;
+                break;
             }
         }
 
@@ -84,7 +82,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
-        const replyPayload = { content: '❌ Houve um erro crítico!', ephemeral: true };
+        const replyPayload = { content: '❌ Houve um erro crítico ao processar esta ação!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp(replyPayload).catch(() => {});
         } else {
@@ -114,7 +112,9 @@ async function registerSlashCommands() {
     try {
         const commandsToDeploy = [];
         for (const handler of client.handlers.values()){
-            if(handler.data) commandsToDeploy.push(handler.data.toJSON());
+            if(handler.data) {
+                commandsToDeploy.push(handler.data.toJSON());
+            }
         }
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandsToDeploy });
         console.log(`[INFO] Comandos (/) registrados com sucesso.`);
