@@ -1,5 +1,7 @@
+const { EmbedBuilder } = require('discord.js');
 const db = require('../../../database/db.js');
 const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
+const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../../views/setup_views.js');
 
 module.exports = {
   customId: (id) => id.startsWith('academy_schedule_course_modal'),
@@ -25,13 +27,40 @@ module.exports = {
         return await interaction.editReply('❌ Data ou horário inválido. Use o formato DD/MM/AAAA e HH:MM e garanta que seja uma data futura.');
       }
 
+      const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
+
+      // 1. Salva a aula agendada no banco de dados
       await db.run(
         'INSERT INTO academy_events (course_id, guild_id, scheduled_by, scheduled_at, event_time, title) VALUES ($1, $2, $3, $4, $5, $6)',
-        [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), Math.floor(eventTime.getTime() / 1000), title]
+        [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), eventTimestamp, title]
       );
       
+      // 2. Notifica a turma na sala de discussão
+      if (course.thread_id) {
+        const thread = await interaction.guild.channels.fetch(course.thread_id).catch(() => null);
+        if (thread) {
+            const enrollments = await db.all('SELECT user_id FROM academy_enrollments WHERE course_id = $1', [courseId]);
+            const mentionString = enrollments.map(e => `<@${e.user_id}>`).join(' ');
+
+            const notificationEmbed = new EmbedBuilder()
+                .setColor('Green')
+                .setTitle('📢 Nova Aula Agendada!')
+                .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
+                .setDescription(`Atenção, turma! Uma nova aula para o curso **${course.name}** foi agendada.`)
+                .addFields(
+                    { name: 'Aula', value: title, inline: true },
+                    { name: 'Instrutor', value: interaction.user.toString(), inline: true },
+                    { name: 'Data', value: `<t:${eventTimestamp}:F> (<t:${eventTimestamp}:R>)` }
+                )
+                .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+            
+            await thread.send({ content: mentionString.length > 0 ? `Atenção, inscritos: ${mentionString}` : 'Nova aula agendada!', embeds: [notificationEmbed] });
+        }
+      }
+
+      // 3. Atualiza o painel público e confirma ao admin
       await updateAcademyPanel(interaction.client);
-      await interaction.editReply({ content: `✅ Aula **${title}** para o curso **${course.name}** agendada com sucesso! O painel público foi atualizado.` });
+      await interaction.editReply({ content: `✅ Aula **"${title}"** agendada e turma notificada com sucesso! O painel público foi atualizado.` });
       
     } catch (error) {
       console.error("Erro ao agendar o curso:", error);

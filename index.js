@@ -24,8 +24,7 @@ const client = new Client({
     ],
 });
 
-client.commandHandlers = new Collection();
-client.componentHandlers = []; // Array unificado para todos os componentes
+client.handlers = new Collection();
 
 async function startBot() {
     await initializeDatabase();
@@ -45,12 +44,10 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
-                if (handler.data) { // É um comando de barra
-                    client.commandHandlers.set(handler.data.name, handler);
-                    console.log(`[INFO] Handler de Comando Carregado: ${file.name}`);
-                } else if (handler.customId) { // É um componente (botão, menu, modal)
-                    client.componentHandlers.push(handler);
-                    console.log(`[INFO] Handler de Componente Carregado: ${file.name}`);
+                const key = handler.data?.name || handler.customId;
+                if (key) {
+                    client.handlers.set(key, handler);
+                    console.log(`[INFO] Handler Carregado: ${file.name}`);
                 }
             } catch (error) {
                 console.error(`[ERRO] Falha ao carregar o handler: ${file.name}`, error);
@@ -61,27 +58,24 @@ function loadHandlers(dir) {
 
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
-        let handler;
-        if (interaction.isChatInputCommand()) {
-            handler = client.commandHandlers.get(interaction.commandName);
-        } else if (interaction.isMessageComponent() || interaction.isModalSubmit() || interaction.isUserSelectMenu() || interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu()) {
-            const key = interaction.customId;
-            for (const componentHandler of client.componentHandlers) {
-                if (typeof componentHandler.customId === 'function' && componentHandler.customId(key)) {
-                    handler = componentHandler;
-                    break;
-                }
-                if (typeof componentHandler.customId === 'string' && componentHandler.customId === key) {
-                    handler = componentHandler;
-                    break;
-                }
+        const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
+        let handler = null;
+
+        // Roteador Universal e à Prova de Falhas
+        for (const [handlerKey, handlerValue] of client.handlers.entries()) {
+            if (typeof handlerKey === 'function' && handlerKey(key)) {
+                handler = handlerValue;
+                break;
+            }
+            if (typeof handlerKey === 'string' && handlerKey === key) {
+                handler = handlerValue;
+                break;
             }
         }
 
         if (!handler) {
-            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${interaction.customId || interaction.commandName}`);
+            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
         }
-        
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
@@ -116,8 +110,10 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     try {
         const commandsToDeploy = [];
-        client.commandHandlers.forEach(handler => {
-            commandsToDeploy.push(handler.data.toJSON());
+        client.handlers.forEach(handler => {
+            if (handler.data) {
+                commandsToDeploy.push(handler.data.toJSON());
+            }
         });
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandsToDeploy });
         console.log(`[INFO] Comandos (/) registrados com sucesso.`);
