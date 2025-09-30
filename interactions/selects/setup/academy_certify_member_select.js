@@ -4,8 +4,6 @@ const { EmbedBuilder } = require('discord.js');
 
 async function sendCertificationNotification(interaction, member, course) {
     const timestamp = Math.floor(Date.now() / 1000);
-
-    // 1. Enviar log
     try {
         const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'academy_logs_channel_id'"))?.value;
         if (logChannelId) {
@@ -25,11 +23,8 @@ async function sendCertificationNotification(interaction, member, course) {
                 await logChannel.send({ embeds: [logEmbed] });
             }
         }
-    } catch (error) {
-        console.error("Falha ao enviar log de certificação da academia:", error);
-    }
+    } catch (error) { console.error("Falha ao enviar log de certificação:", error); }
 
-    // 2. Enviar DM
     try {
         const role = interaction.guild.roles.cache.get(course.role_id);
         const roleMention = role ? role.toString() : 'Nenhum cargo associado';
@@ -65,19 +60,19 @@ module.exports = {
                 return await interaction.followUp({ content: '❌ Curso não encontrado.', ephemeral: true });
             }
 
+            // Realiza todas as operações de banco de dados e Discord
             await db.run('DELETE FROM academy_enrollments WHERE user_id = $1 AND course_id = $2', [userId, courseId]);
-            
-            await db.run(
-                'INSERT INTO user_certifications (user_id, course_id, completion_date, certified_by) VALUES ($1, $2, $3, $4)',
-                [userId, courseId, Math.floor(Date.now() / 1000), certifiedBy]
-            );
+            await db.run('INSERT INTO user_certifications (user_id, course_id, completion_date, certified_by) VALUES ($1, $2, $3, $4)', [userId, courseId, Math.floor(Date.now() / 1000), certifiedBy]);
             
             const member = await interaction.guild.members.fetch(userId);
             const role = interaction.guild.roles.cache.get(course.role_id);
             if (member && role) {
                 await member.roles.add(role, `Certificado no curso: ${course.name}`);
             }
-
+            if (course.thread_id) {
+                const thread = await interaction.guild.channels.fetch(course.thread_id).catch(() => null);
+                if (thread) await thread.members.remove(userId, 'Curso concluído e certificado.').catch(console.error);
+            }
             await sendCertificationNotification(interaction, member, course);
             
             // --- LÓGICA CORRIGIDA ---
@@ -86,11 +81,12 @@ module.exports = {
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(course, interaction.guild, updatedEnrollments);
             await interaction.message.edit(updatedDashboard);
 
-            // 2. Apenas depois de ter sucesso, envia a confirmação privada.
+            // 2. Apenas depois, envia a confirmação privada.
             await interaction.followUp({ content: `✅ <@${userId}> certificado(a) e notificado(a) com sucesso! O painel foi atualizado.`, ephemeral: true });
 
         } catch (error) {
             console.error("Erro ao certificar oficial:", error);
+            // Se um erro ocorrer, o followUp é usado para a mensagem de erro.
             await interaction.followUp({ content: '❌ Ocorreu um erro ao certificar o oficial.', ephemeral: true });
         }
     },
