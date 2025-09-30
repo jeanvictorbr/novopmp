@@ -439,11 +439,8 @@ module.exports = {
   getCorregedoriaMenuPayload,
   getCorregedoriaPunishmentsMenuPayload,
   getDecorationsMenuPayload,
-  getRecordsMenuPayload,
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
   getTagsMenuPayload,
-  getEnlistmentMenuPayload,
-  SETUP_FOOTER_TEXT,         // <-- CONSTANTE EXPORTADA
-  SETUP_FOOTER_ICON_URL      // <-- CONSTANTE EXPORTADA
+  getEnlistmentMenuPayload // Mantém a função correta que estamos a usar
 };
