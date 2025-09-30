@@ -373,7 +373,7 @@ async function getHierarchyMenuPayload(db) {
   return { embeds: [embed], components: [row1, row2, row3] };
 }
 
-async function getTagsMenuPayload(db) {
+async function getTagsMenuPayload(db, guild) {
   const tags = await db.all('SELECT role_id, tag FROM role_tags');
   const embed = new EmbedBuilder()
     .setColor('Greyple')
@@ -384,11 +384,11 @@ async function getTagsMenuPayload(db) {
 
   if (tags.length > 0) {
     let tagList = '';
-    // Corrigido: Iterar sobre os resultados de forma segura
+    // Itera sobre os resultados para construir a lista de forma segura.
     for (const t of tags) {
-        // A query para buscar o nome do cargo foi removida para evitar erros caso a tabela não exista,
-        // e substituída pela menção direta do cargo, que é mais confiável.
-        tagList += `\`[${t.tag}]\` - Cargo: <@&${t.role_id}>\n`;
+        // Busca o cargo no cache do servidor para exibir o nome.
+        const role = guild.roles.cache.get(t.role_id);
+        tagList += `\`[${t.tag}]\` - ${role ? role.name : 'Cargo não encontrado'}\n`;
     }
     embed.addFields({ name: 'Tags Configuradas', value: tagList });
   } else {
@@ -396,11 +396,17 @@ async function getTagsMenuPayload(db) {
   }
   
   const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('tags_add_edit').setLabel('Adicionar / Editar Tag').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('tags_remove').setLabel('Remover Tag').setStyle(ButtonStyle.Danger).setDisabled(tags.length === 0),
+    new ButtonBuilder().setCustomId('tags_add_edit').setLabel('Adicionar / Editar').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('tags_remove').setLabel('Remover').setStyle(ButtonStyle.Danger).setDisabled(tags.length === 0),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [buttons] };
+  
+  // NOVO: Botão de Sincronização
+  const syncButton = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('tags_sync_all').setLabel('Sincronizar Todos').setStyle(ButtonStyle.Primary).setEmoji('🔄')
+  );
+
+  return { embeds: [embed], components: [buttons, syncButton] };
 }
 
 // CORREÇÃO DEFINITIVA: Garante que TODAS as funções de payload sejam exportadas.

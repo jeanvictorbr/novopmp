@@ -1,15 +1,16 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
-const { updateMemberTag } = require('./utils/tagUpdater.js');
 const path = require('node:path');
 require('dotenv-flow').config();
+const db = require('./database/db.js');
 
-// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
+// MONITORES E FUNÇÕES GLOBAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
 const { dashboardMonitor } = require('./utils/dashboardMonitor.js');
 const { hierarchyMonitor } = require('./utils/hierarchyMonitor.js');
+const { updateMemberTag } = require('./utils/tagUpdater.js'); // <-- IMPORTAÇÃO DA FUNÇÃO DE TAGS
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -25,23 +26,14 @@ const client = new Client({
 
 client.handlers = new Collection();
 
-// FUNÇÃO PRINCIPAL DE INICIALIZAÇÃO
 async function startBot() {
-    // 1. VERIFICA E CRIA AS TABELAS DO BANCO DE DADOS
     await initializeDatabase();
-
-    // 2. CARREGA TODOS OS COMANDOS E INTERAÇÕES
     loadHandlers('commands');
     loadHandlers('interactions');
-
-    // 3. REGISTRA OS COMANDOS DE BARRA NO DISCORD
     registerSlashCommands();
-
-    // 4. FAZ O LOGIN DO BOT
     client.login(DISCORD_TOKEN);
 }
 
-// --- SISTEMA DE CARREGAMENTO DE HANDLERS ---
 function loadHandlers(dir) {
     const fullPath = path.join(__dirname, dir);
     if (!fs.existsSync(fullPath)) return;
@@ -59,19 +51,10 @@ function loadHandlers(dir) {
     }
 }
 
-client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
-    // A função é chamada se os cargos do membro mudarem.
-    if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
-        updateMemberTag(newMember);
-    }
-});
-
-// --- O "CÉREBRO" DO BOT ---
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
         let handler;
         const key = interaction.isChatInputCommand() ? interaction.commandName : interaction.customId;
-
         for (const item of client.handlers.values()) {
             if (typeof item.customId === 'function' && item.customId(key)) {
                 handler = item;
@@ -79,10 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
         }
         if (!handler) handler = client.handlers.get(key);
-
-        if (!handler) {
-            return console.error(`[AVISO] Nenhum handler encontrado para a interação: ${key}`);
-        }
+        if (!handler) return console.error(`[AVISO] Nenhum handler encontrado para: ${key}`);
         await handler.execute(interaction);
     } catch (error) {
         console.error('Erro geral ao processar interação:', error);
@@ -94,7 +74,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 });
 
-// --- EVENTOS E MONITORES PÓS-INICIALIZAÇÃO ---
+// --- NOVO EVENTO PARA ATUALIZAÇÃO DE TAGS EM TEMPO REAL ---
+// Este evento é acionado sempre que um membro é atualizado (ex: recebe um novo cargo).
+client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+    // Compara os cargos antigos com os novos. Se forem diferentes, chama a função.
+    if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
+        console.log(`[TAGS] Detectada mudança de cargos para ${newMember.user.tag}. Verificando tag...`);
+        updateMemberTag(newMember);
+    }
+});
+
 client.once(Events.ClientReady, readyClient => {
     setInterval(() => punishmentMonitor(readyClient), 20000); 
     setInterval(() => patrolMonitor(readyClient), 30000);
@@ -104,9 +93,8 @@ client.once(Events.ClientReady, readyClient => {
     console.log(`\n---\nLogado como ${readyClient.user.tag}\n---`);
 });
 
-// --- REGISTRO DE COMANDOS ---
-const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
 async function registerSlashCommands() {
+    const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     try {
         const commandsToDeploy = [];
         for (const handler of client.handlers.values()){
@@ -119,5 +107,4 @@ async function registerSlashCommands() {
     }
 }
 
-// --- INICIA O BOT ---
 startBot();
