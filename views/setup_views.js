@@ -93,6 +93,7 @@ async function getAcademyMenuPayload(db) {
     const courses = await db.all('SELECT * FROM academy_courses');
     const settings = await db.all("SELECT key, value FROM settings WHERE key IN ('academy_channel_id', 'academy_discussion_channel_id', 'academy_logs_channel_id')");
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
+    
     const embed = new EmbedBuilder()
         .setColor(0xFEEA0A)
         .setTitle('🎓 Configuração do Módulo Academia')
@@ -100,49 +101,39 @@ async function getAcademyMenuPayload(db) {
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFields(
             { name: 'Canal de Estudos (Painel Público)', value: settingsMap.has('academy_channel_id') ? `<#${settingsMap.get('academy_channel_id')}>` : '`Não definido`', inline: false },
-            { name: 'Canal de Discussões (Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`Não definido`', inline: false },
             { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false }
         )
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+    
     if (courses.length > 0) {
-        const coursesList = courses.map(c => `**${c.name}**\n\`ID: ${c.course_id}\` - Horas Mínimas: \`${c.required_hours}\``).join('\n\n');
+        const coursesList = courses.map(c => `**${c.name}** (\`ID: ${c.course_id}\`)`).join('\n');
         embed.addFields({ name: 'Cursos Atuais', value: coursesList });
     } else {
         embed.addFields({ name: 'Cursos Atuais', value: '`Nenhum curso configurado.`' });
     }
-    const actionButtons = new ActionRowBuilder().addComponents(
+    
+    const courseManagementButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_add_course').setLabel('Adicionar Curso').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('academy_edit_course').setLabel('Editar Curso').setStyle(ButtonStyle.Secondary).setDisabled(courses.length === 0),
         new ButtonBuilder().setCustomId('academy_remove_course').setLabel('Remover Curso').setStyle(ButtonStyle.Danger).setDisabled(courses.length === 0)
     );
-    const certifyButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('academy_certify_official').setLabel('Certificar Oficial').setStyle(ButtonStyle.Success).setEmoji('🎖️').setDisabled(courses.length === 0)
+    
+    const scheduleButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('academy_schedule_waiting_list').setLabel('Agendar para Turma em Espera').setStyle(ButtonStyle.Success).setEmoji('🗓️').setDisabled(courses.length === 0),
+        new ButtonBuilder().setCustomId('academy_schedule_independent').setLabel('Agendar Aula Avulsa').setStyle(ButtonStyle.Success).setEmoji('📅').setDisabled(courses.length === 0)
     );
-    const scheduleButton = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('academy_schedule_course').setLabel('Agendar Curso').setStyle(ButtonStyle.Primary).setEmoji('🗓️').setDisabled(courses.length === 0)
+
+    const certificationButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('academy_certify_official').setLabel('Gerenciar & Certificar Turmas').setStyle(ButtonStyle.Primary).setEmoji('🎖️').setDisabled(courses.length === 0)
     );
+    
     const configButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal de Estudos').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
-    const components = [actionButtons, certifyButton, scheduleButton, configButtons];
-    if (courses.length > 0) {
-        const options = courses.map(c => ({
-            label: c.name,
-            description: `Requisitos: ${c.required_hours}h`,
-            value: c.course_id,
-        }));
-        const selectMenu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId('academy_view_details')
-                .setPlaceholder('🔍 Ver detalhes de um curso...')
-                .addOptions(options),
-        );
-        components.splice(1, 0, selectMenu);
-    }
-    return { embeds: [embed], components: components };
+
+    return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons] };
 }
 
 async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
