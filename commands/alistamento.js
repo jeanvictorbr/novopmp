@@ -1,8 +1,8 @@
 // Local: commands/alistamento.js
 
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js'); // ADICIONADO StringSelectMenuBuilder
 const db = require('../database/db.js');
-const { createQuizManagerEmbed } = require('../interactions/handlers/enlistment_quiz_handler.js'); // Importaremos uma nova função
+const { createQuizManagerEmbed } = require('../interactions/handlers/enlistment_quiz_handler.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -60,7 +60,7 @@ module.exports = {
         }
         else if (subcommand === 'painelprovas') {
             await interaction.deferReply({ ephemeral: true });
-            const channelId = interaction.channel.id; // Envia no canal onde o comando foi usado
+            const channelId = interaction.channel.id;
             const channel = await interaction.guild.channels.fetch(channelId);
 
             const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes");
@@ -77,7 +77,7 @@ module.exports = {
             } else {
                 const options = quizzes.map(q => ({
                     label: q.title,
-                    value: `quiz_public_start_${q.quiz_id}`,
+                    value: `quiz_start_${interaction.user.id}_${q.quiz_id}`, // CORRIGIDO PARA O FORMATO CORRETO
                     description: `ID da Prova: ${q.quiz_id}`,
                     emoji: '✍️'
                 }));
@@ -92,16 +92,16 @@ module.exports = {
             await interaction.editReply(`✅ Painel de provas enviado com sucesso neste canal!`);
         }
         else if (subcommand === 'criaprova') {
+            await interaction.deferReply({ ephemeral: true }); // Deferir aqui para evitar falhas
             const title = interaction.options.getString('titulo');
             const passingScore = interaction.options.getInteger('nota_minima') || 70;
 
             const result = await db.run('INSERT INTO enlistment_quizzes (title, questions, passing_score) VALUES ($1, $2, $3) RETURNING quiz_id', [title, '[]', passingScore]);
             const quizId = result.rows[0].quiz_id;
             
-            // Agora, usamos a nova função para gerar um painel de gestão dinâmico
             const { embeds, components } = await createQuizManagerEmbed(quizId);
             
-            await interaction.reply({ embeds, components, ephemeral: true });
+            await interaction.editReply({ embeds, components });
         }
     },
 };
