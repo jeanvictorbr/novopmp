@@ -14,7 +14,7 @@ async function generateDossieEmbed(targetUser, guild) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
 
-    // DADOS DE RECRUTAMENTO
+    // DADOS DE RECRUTAMENTO (ROBUSTO)
     const recruitmentData = await db.get("SELECT COUNT(*)::int AS count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
     const totalRecruits = recruitmentData?.count || 0;
 
@@ -27,7 +27,7 @@ async function generateDossieEmbed(targetUser, guild) {
     `, [userId]);
     let coursesText = certifications.map(c => `> ✅ **${c.name}**\n> Concluído em <t:${c.completion_date}:d> | Certificado por: <@${c.certified_by || 'Desconhecido'}>`).join('\n\n') || '`Nenhum curso concluído.`';
 
-    // HISTÓRICO DE CONDECORAÇÕES (NOVO)
+    // HISTÓRICO DE CONDECORAÇÕES (REINTEGRADO)
     const decorations = await db.all(`
         SELECT m.name, m.emoji, ud.awarded_by, ud.awarded_at
         FROM user_decorations ud

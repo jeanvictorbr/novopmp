@@ -2,7 +2,39 @@ const { getCourseEnrollmentDashboardPayload } = require('../../../views/setup_vi
 const db = require('../../../database/db.js');
 const { EmbedBuilder } = require('discord.js');
 
-async function sendCertificationNotification(interaction, member, course) { /* ... (código inalterado) ... */ }
+async function sendCertificationNotification(interaction, member, course) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    try {
+        const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'academy_logs_channel_id'"))?.value;
+        if (logChannelId) {
+            const logChannel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder().setColor('Green').setTitle('🎖️ Nova Certificação (em Massa)').setThumbnail(member.user.displayAvatarURL())
+                    .addFields(
+                        { name: 'Oficial Certificado', value: member.toString(), inline: true },
+                        { name: 'Curso Concluído', value: `**${course.name}**`, inline: true },
+                        { name: 'Certificado por', value: interaction.user.toString(), inline: false },
+                        { name: 'Data da Certificação', value: `<t:${timestamp}:F>`, inline: false }
+                    ).setTimestamp();
+                await logChannel.send({ embeds: [logEmbed] });
+            }
+        }
+    } catch (error) { console.error("Falha ao enviar log de certificação:", error); }
+    try {
+        const role = interaction.guild.roles.cache.get(course.role_id);
+        const roleMention = role ? role.toString() : 'Nenhum cargo associado';
+        const dmEmbed = new EmbedBuilder().setColor('Gold').setTitle('🎉 Parabéns! Você foi certificado!').setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
+            .setDescription(`Você concluiu com sucesso os requisitos e foi aprovado(a) no curso **${course.name}**.`)
+            .addFields(
+                { name: 'Cargo Recebido', value: roleMention, inline: true },
+                { name: 'Data da Certificação', value: `<t:${timestamp}:f>`, inline: true }
+            ).setFooter({ text: 'Continue se dedicando e aprimorando suas habilidades.' });
+        await member.send({ embeds: [dmEmbed] });
+    } catch (error) {
+        console.error(`Falha ao enviar DM para ${member.user.tag}:`, error);
+        interaction.followUp({ content: `⚠️ Não foi possível notificar ${member.toString()} por DM.`, ephemeral: true }).catch(console.error);
+    }
+}
 
 module.exports = {
     customId: (customId) => customId.startsWith('academy_certify_all'),
@@ -38,9 +70,11 @@ module.exports = {
                 await sendCertificationNotification(interaction, member, course);
             }
 
-            await interaction.followUp({ content: `✅ **${validMembers.length}** oficiais foram certificados e notificados. O painel foi atualizado.`, ephemeral: true });
+            // FLUXO CORRIGIDO
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(course, interaction.guild, []);
             await interaction.message.edit(updatedDashboard);
+            
+            await interaction.followUp({ content: `✅ **${validMembers.length}** oficiais foram certificados e notificados. O painel foi atualizado.`, ephemeral: true });
 
         } catch (error) {
             console.error("Erro ao certificar todos:", error);
@@ -48,41 +82,3 @@ module.exports = {
         }
     },
 };
-
-// Cole a função sendCertificationNotification completa aqui, se ela estiver no mesmo arquivo.
-async function sendCertificationNotification(interaction, member, course) {
-    const timestamp = Math.floor(Date.now() / 1000);
-    try {
-        const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'academy_logs_channel_id'"))?.value;
-        if (logChannelId) {
-            const logChannel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
-            if (logChannel) {
-                const logEmbed = new EmbedBuilder()
-                    .setColor('Green').setTitle('🎖️ Nova Certificação (em Massa)').setThumbnail(member.user.displayAvatarURL())
-                    .addFields(
-                        { name: 'Oficial Certificado', value: member.toString(), inline: true },
-                        { name: 'Curso Concluído', value: `**${course.name}**`, inline: true },
-                        { name: 'Certificado por', value: interaction.user.toString(), inline: false },
-                        { name: 'Data da Certificação', value: `<t:${timestamp}:F>`, inline: false }
-                    ).setTimestamp();
-                await logChannel.send({ embeds: [logEmbed] });
-            }
-        }
-    } catch (error) { console.error("Falha ao enviar log de certificação:", error); }
-    try {
-        const role = interaction.guild.roles.cache.get(course.role_id);
-        const roleMention = role ? role.toString() : 'Nenhum cargo associado';
-        const dmEmbed = new EmbedBuilder()
-            .setColor('Gold').setTitle('🎉 Parabéns! Você foi certificado!')
-            .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-            .setDescription(`Você concluiu com sucesso os requisitos e foi aprovado(a) no curso **${course.name}**.`)
-            .addFields(
-                { name: 'Cargo Recebido', value: roleMention, inline: true },
-                { name: 'Data da Certificação', value: `<t:${timestamp}:f>`, inline: true }
-            ).setFooter({ text: 'Continue se dedicando e aprimorando suas habilidades.' });
-        await member.send({ embeds: [dmEmbed] });
-    } catch (error) {
-        console.error(`Falha ao enviar DM para ${member.user.tag}:`, error);
-        interaction.followUp({ content: `⚠️ Não foi possível notificar ${member.toString()} por DM.`, ephemeral: true }).catch(console.error);
-    }
-}
