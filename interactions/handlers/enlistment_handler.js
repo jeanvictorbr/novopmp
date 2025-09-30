@@ -47,6 +47,7 @@ const enlistmentHandler = {
         try {
             const { customId } = interaction;
             if (customId === 'delete_cancel') return await interaction.update({ content: 'Ação cancelada.', components: [], embeds: [] }).catch(() => {});
+            
             if (interaction.isModalSubmit()) {
                 if (customId === 'quiz_admin_create_modal') return this.handleCreateQuizModal(interaction);
                 if (customId.startsWith('quiz_admin_add_question_modal_')) return this.handleAddQuestionModal(interaction);
@@ -54,6 +55,7 @@ const enlistmentHandler = {
                 if (customId === 'enlistment_apply_modal') return this.handleEnlistmentModal(interaction);
                 return;
             }
+
             if (customId.startsWith('enlistment_setup_')) return this.handleSetup(interaction);
             if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
             if (customId === 'enlistment_start_process') return this.handleStartProcess(interaction);
@@ -127,12 +129,14 @@ const enlistmentHandler = {
             const mainAction = parts[0];
     
             if (mainAction === 'quiz_admin') {
-                const [, action, quizId, questionIndex] = parts;
+                const [, action, quizId, questionIndexStr] = parts;
+                const questionIndex = parseInt(questionIndexStr, 10);
+
                 if (action === 'open_edit_modal') {
                     const questions = await getQuestions(quizId);
-                    const questionData = questions?.[parseInt(questionIndex)];
+                    const questionData = questions?.[questionIndex];
                     if (!questionData) return interaction.reply({ content: '❌ Pergunta não encontrada ou índice inválido.', ephemeral: true });
-                    const modal = new ModalBuilder().setCustomId(`quiz_admin_edit_question_modal|${quizId}|${questionIndex}`).setTitle(`Editando Pergunta #${parseInt(questionIndex, 10) + 1}`);
+                    const modal = new ModalBuilder().setCustomId(`quiz_admin_edit_question_modal|${quizId}|${questionIndex}`).setTitle(`Editando Pergunta #${questionIndex + 1}`);
                     modal.addComponents(
                         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado").setStyle(TextInputStyle.Paragraph).setValue(questionData.question).setRequired(true)),
                         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas").setStyle(TextInputStyle.Paragraph).setValue(questionData.options.join('\n')).setRequired(true)),
@@ -204,42 +208,6 @@ const enlistmentHandler = {
         }
     },
     
-    async handleCreateQuizModal(interaction) { /* ... */ },
-    async handleAddQuestionModal(interaction) { /* ... */ },
-    async handleEditQuestionModal(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-        const [, quizId, questionIndex] = interaction.customId.split('|');
-        try {
-            const questionText = interaction.fields.getTextInputValue('question_text');
-            const optionsText = interaction.fields.getTextInputValue('options');
-            const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
-            const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
-            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
-            const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
-            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
-            const questions = await getQuestions(quizId);
-            if (questions === null) return await interaction.editReply({ content: '❌ Erro: A prova correspondente não foi encontrada.' });
-            if (!questions[questionIndex]) return await interaction.editReply({ content: '❌ Erro: A pergunta que você tentou editar não existe mais.' });
-            questions[questionIndex] = { question: questionText, options: options, correct: correctAnswerLetter };
-            const success = await saveQuestions(quizId, questions);
-            if (success) await interaction.editReply({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada com sucesso!` });
-            else await interaction.editReply({ content: '❌ Falha ao salvar as alterações no banco de dados.' });
-        } catch (error) {
-            console.error("Erro ao editar pergunta:", error);
-            await interaction.editReply({ content: '❌ Ocorreu um erro crítico ao salvar as alterações.' });
-        }
-    },
-    async handleStartProcess(interaction) { /* ... */ },
-    async handleEnlistmentModal(interaction) { /* ... */ },
-    async startQuiz(interaction) { /* ... */ },
-    async sendQuestion(interaction, channel, quizState, edit = false) { /* ... */ },
-    async handleQuizAnswer(interaction) { /* ... */ },
-    async endQuiz(interaction, channel, quizState) { /* ... */ },
-    async sendLog(interaction, quizState, finalScore, passed) { /* ... */ },
-    async handleApproval(interaction) { /* ... */ },
-};
-
-Object.assign(enlistmentHandler, {
     async handleCreateQuizModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const title = interaction.fields.getTextInputValue('quiz_title');
@@ -250,6 +218,7 @@ Object.assign(enlistmentHandler, {
         await db.run('INSERT INTO enlistment_quizzes (title, passing_score, questions) VALUES ($1, $2, $3)', [title, passingScore, '[]']);
         await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso! Volte ao menu para vê-la na lista.` });
     },
+
     async handleAddQuestionModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const quizId = interaction.customId.split('_').pop();
@@ -272,6 +241,35 @@ Object.assign(enlistmentHandler, {
             await interaction.editReply({ content: '❌ Ocorreu um erro crítico ao processar o formulário.' });
         }
     },
+
+    async handleEditQuestionModal(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        const [, quizId, questionIndexStr] = interaction.customId.split('|');
+        const questionIndex = parseInt(questionIndexStr, 10);
+        try {
+            const questionText = interaction.fields.getTextInputValue('question_text');
+            const optionsText = interaction.fields.getTextInputValue('options');
+            const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
+            const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
+            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
+            const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
+            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
+            
+            const questions = await getQuestions(quizId);
+            if (questions === null) return await interaction.editReply({ content: '❌ Erro: A prova correspondente não foi encontrada.' });
+            if (!questions[questionIndex]) return await interaction.editReply({ content: '❌ Erro: A pergunta que você tentou editar não existe mais.' });
+            
+            questions[questionIndex] = { question: questionText, options: options, correct: correctAnswerLetter };
+
+            const success = await saveQuestions(quizId, questions);
+            if (success) await interaction.editReply({ content: `✅ Pergunta #${questionIndex + 1} atualizada com sucesso!` });
+            else await interaction.editReply({ content: '❌ Falha ao salvar as alterações no banco de dados.' });
+        } catch (error) {
+            console.error("Erro ao editar pergunta:", error);
+            await interaction.editReply({ content: '❌ Ocorreu um erro crítico ao salvar as alterações.' });
+        }
+    },
+    
     async handleStartProcess(interaction) {
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
         const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
@@ -289,6 +287,7 @@ Object.assign(enlistmentHandler, {
         );
         await interaction.showModal(modal);
     },
+
     async handleEnlistmentModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const rpName = interaction.fields.getTextInputValue('rp_name');
@@ -296,7 +295,7 @@ Object.assign(enlistmentHandler, {
         const approvalChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_approval_channel_id'"))?.value;
         const recruiterRoleId = (await db.get("SELECT value FROM settings WHERE key = 'recruiter_role_id'"))?.value;
         if (!approvalChannelId || !recruiterRoleId) {
-            return interaction.editReply({ content: '❌ O sistema de alistamento não está configurado.' });
+            return await interaction.editReply({ content: '❌ O sistema de alistamento não está configurado.' });
         }
         const result = await db.run('INSERT INTO enlistment_requests (user_id, rp_name, game_id, request_date, status) VALUES ($1, $2, $3, $4, $5) RETURNING request_id', [interaction.user.id, rpName, gameId, Math.floor(Date.now() / 1000), 'pending']);
         const requestId = result.rows[0].request_id;
@@ -310,6 +309,7 @@ Object.assign(enlistmentHandler, {
         await channel.send({ content: `Atenção, <@&${recruiterRoleId}>!`, embeds: [embed], components: [buttons] });
         await interaction.editReply({ content: '✅ A sua ficha foi enviada para análise!' });
     },
+    
     async startQuiz(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const userId = interaction.user.id;
@@ -355,6 +355,7 @@ Object.assign(enlistmentHandler, {
         userQuizStates.set(userId, quizState);
         await interaction.editReply({ content: `✅ Sua prova começou! Acesse o canal ${channel} para responder.` });
     },
+
     async sendQuestion(interaction, channel, quizState, edit = false) {
         const questionData = quizState.questions[quizState.currentQuestionIndex];
         const guild = interaction.guild;
@@ -383,6 +384,7 @@ Object.assign(enlistmentHandler, {
         }
         return await channel.send({ embeds: [embed], components: [answerButtons] });
     },
+
     async handleQuizAnswer(interaction) {
         await interaction.deferUpdate();
         const userId = interaction.user.id;
@@ -397,12 +399,13 @@ Object.assign(enlistmentHandler, {
         }
         
         const newRow = ActionRowBuilder.from(interaction.message.components[0]);
-        newRow.components.forEach((button, index) => {
+        newRow.components.forEach((button) => {
             const buttonBuilder = ButtonBuilder.from(button).setDisabled(true);
             if(button.data.label === chosenLetter){
                 buttonBuilder.setStyle(ButtonStyle.Primary);
             }
-            newRow.components[index] = buttonBuilder;
+            const buttonIndex = newRow.components.indexOf(button);
+            newRow.components[buttonIndex] = buttonBuilder;
         });
         await interaction.editReply({ components: [newRow] });
         quizState.currentQuestionIndex++;
@@ -416,6 +419,7 @@ Object.assign(enlistmentHandler, {
             }
         }, 1000);
     },
+
     async endQuiz(interaction, channel, quizState) {
         const userId = interaction.user.id;
         const finalScore = (quizState.score / quizState.questions.length) * 100;
@@ -456,6 +460,7 @@ Object.assign(enlistmentHandler, {
         userQuizStates.delete(userId);
         setTimeout(() => channel.delete('Prova concluída.').catch(() => {}), 60000);
     },
+
     async sendLog(interaction, quizState, finalScore, passed) {
         const { value: logChannelId } = await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'") || {};
         if (!logChannelId) return;
@@ -478,12 +483,15 @@ Object.assign(enlistmentHandler, {
             .setTimestamp();
         await logChannel.send({ embeds: [logEmbed] });
     },
+    
     async handleApproval(interaction) {
         await interaction.deferUpdate();
         const [action, requestId] = interaction.customId.replace('enlistment_', '').split('_');
         const newStatus = action === 'approve' ? 'approved' : 'rejected';
         const request = await db.get('SELECT * FROM enlistment_requests WHERE request_id = $1', [requestId]);
-        if (!request || request.status !== 'pending') return;
+        if (!request || request.status !== 'pending') {
+            return interaction.message.edit({ components: [] });
+        }
         const candidate = await interaction.guild.members.fetch(request.user_id).catch(() => null);
         if (!candidate) {
             await db.run('DELETE FROM enlistment_requests WHERE request_id = $1', [requestId]);
@@ -493,10 +501,24 @@ Object.assign(enlistmentHandler, {
         const quizPassedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
         const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
         let dmEmbed;
+        let finalNickname = null;
         if (newStatus === 'approved') {
             if (quizPassedRoleId) await candidate.roles.remove(quizPassedRoleId).catch(console.error);
             if (recruitRoleId) await candidate.roles.add(recruitRoleId).catch(console.error);
-            dmEmbed = new EmbedBuilder().setColor('Green').setTitle('🎉 Alistamento Aprovado!').setDescription('Parabéns! Sua ficha foi aprovada.');
+            dmEmbed = new EmbedBuilder().setColor('Green').setTitle('🎉 Alistamento Aprovado!').setDescription('Parabéns! Sua ficha foi aprovada e seu registro foi concluído.');
+            try {
+                const tagConfig = await db.get('SELECT tag FROM role_tags WHERE role_id = $1', [recruitRoleId]);
+                if (tagConfig && tagConfig.tag) {
+                    finalNickname = `[${tagConfig.tag}] ${request.rp_name} ${request.game_id}`;
+                    if (finalNickname.length > 32) {
+                        finalNickname = finalNickname.substring(0, 32);
+                    }
+                    await candidate.setNickname(finalNickname, 'Alistamento Aprovado');
+                }
+            } catch (error) {
+                console.error("Falha ao tentar alterar o nickname:", error);
+                await interaction.followUp({ content: `⚠️ O candidato ${candidate.toString()} foi aprovado, mas não foi possível alterar seu nickname (provavelmente por ter um cargo superior ao meu).`, ephemeral: true });
+            }
         } else {
             if (quizPassedRoleId) await candidate.roles.remove(quizPassedRoleId).catch(console.error);
             dmEmbed = new EmbedBuilder().setColor('Red').setTitle('❌ Alistamento Recusado').setDescription('Sua ficha foi recusada. Agradecemos o interesse.');
@@ -506,12 +528,24 @@ Object.assign(enlistmentHandler, {
         } catch (e) {
             console.warn(`Não foi possível enviar DM para o candidato ${candidate.id}`);
         }
-        const originalEmbed = new EmbedBuilder(interaction.message.embeds[0].toJSON())
+        const decisionEmbed = new EmbedBuilder()
             .setColor(newStatus === 'approved' ? 'Green' : 'Red')
-            .setTitle(`Ficha ${newStatus === 'approved' ? 'Aprovada' : 'Recusada'}`)
-            .setFooter({ text: `Decisão de ${interaction.user.tag}` });
-        await interaction.message.edit({ embeds: [originalEmbed], components: [] });
+            .setTitle(`Ficha de Alistamento ${newStatus === 'approved' ? 'Aprovada' : 'Recusada'}`)
+            .setAuthor({ name: `Decisão de ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+            .setThumbnail(candidate.user.displayAvatarURL())
+            .addFields(
+                { name: 'Candidato', value: candidate.toString(), inline: true },
+                { name: 'Nome (RP)', value: `\`${request.rp_name}\``, inline: true },
+                { name: 'ID (Jogo)', value: `\`${request.game_id}\``, inline: true }
+            )
+            .setImage(SETUP_EMBED_IMAGE_URL)
+            .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
+            .setTimestamp();
+        if (newStatus === 'approved' && finalNickname) {
+            decisionEmbed.addFields({ name: 'Nickname Definido', value: `\`${finalNickname}\`` });
+        }
+        await interaction.message.edit({ embeds: [decisionEmbed], components: [] });
     }
-});
+};
 
 module.exports = enlistmentHandler;
