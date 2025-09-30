@@ -419,5 +419,7 @@ module.exports = {
   getDecorationsMenuPayload,
   getDecorationsManageMedalsPayload,
   getHierarchyMenuPayload,
-  getTagsMenuPayload
+  getTagsMenuPayload,
+  SETUP_FOOTER_TEXT,         // <-- CONSTANTE EXPORTADA
+  SETUP_FOOTER_ICON_URL      // <-- CONSTANTE EXPORTADA
 };
