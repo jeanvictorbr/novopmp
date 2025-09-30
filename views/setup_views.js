@@ -45,6 +45,12 @@ async function getMainMenuPayload() {
         value: 'module_hierarchy',
         emoji: '📊',
       },
+      {
+        label: 'Módulo Tags Policiais',
+        description: 'Gerencie os nicks e tags automáticas dos cargos.',
+        value: 'module_tags',
+        emoji: '🏷️',
+      },
     ]);
   const row = new ActionRowBuilder().addComponents(selectMenu);
   return { embeds: [embed], components: [row] };
@@ -367,6 +373,32 @@ async function getHierarchyMenuPayload(db) {
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [embed], components: [row1, row2, row3] };
+}
+
+async function getTagsMenuPayload(db) {
+  const tags = await db.all('SELECT role_id, tag FROM role_tags');
+  const embed = new EmbedBuilder()
+    .setColor('Greyple')
+    .setTitle('🏷️ Configuração do Módulo de Tags')
+    .setDescription('Configure as tags que serão aplicadas automaticamente aos nicknames dos membros com base em seus cargos. O bot sempre aplicará a tag do cargo mais alto.');
+
+  if (tags.length > 0) {
+    let tagList = '';
+    for (const t of tags) {
+        const role = await db.query('SELECT name FROM guilds_roles WHERE id = $1', [t.role_id]); // Supondo que você tenha uma tabela de cargos
+        tagList += `\`[${t.tag}]\` - Cargo: ${role.rows.length > 0 ? role.rows[0].name : `<@&${t.role_id}>`}\n`;
+    }
+    embed.addFields({ name: 'Tags Configuradas', value: tagList });
+  } else {
+    embed.addFields({ name: 'Tags Configuradas', value: '`Nenhuma tag configurada ainda.`' });
+  }
+  
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('tags_add_edit').setLabel('Adicionar / Editar Tag').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('tags_remove').setLabel('Remover Tag').setStyle(ButtonStyle.Danger).setDisabled(tags.length === 0),
+    new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [buttons] };
 }
 
 

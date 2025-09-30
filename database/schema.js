@@ -123,6 +123,15 @@ const schemaSQL = `
     CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
         role_id VARCHAR(255) PRIMARY KEY
     );
+    CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
+        role_id VARCHAR(255) PRIMARY KEY
+    );
+    
+    -- Tabela do Módulo Tags Policiais --
+    CREATE TABLE IF NOT EXISTS role_tags (
+        role_id VARCHAR(255) PRIMARY KEY,
+        tag TEXT NOT NULL
+    );
 `;
 
 // Esta função será chamada na inicialização do bot.

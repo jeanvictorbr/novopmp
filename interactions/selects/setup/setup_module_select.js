@@ -1,5 +1,4 @@
-// CORREÇÃO: Importar a nova função do módulo de carreira
-const { getCopomMenuPayload, getAcademyMenuPayload, getHierarchyMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload } = require('../../../views/setup_views.js');
+const { getCopomMenuPayload, getAcademyMenuPayload, getCorregedoriaMenuPayload, getDecorationsMenuPayload, getHierarchyMenuPayload, getTagsMenuPayload } = require('../../../views/setup_views.js');
 const db = require('../../../database/db.js');
 
 module.exports = {
@@ -15,21 +14,23 @@ module.exports = {
         payload = await getCopomMenuPayload(db);
       } else if (selectedModule === 'module_academy') {
         payload = await getAcademyMenuPayload(db);
-      } else if (selectedModule === 'module_hierarchy') { // Adicione este bloco
-        payload = await getHierarchyMenuPayload(db);
-      } else if (selectedModule === 'module_corregedoria') {
+      } else if (selectedModule === 'module_corregedoria') { 
         payload = await getCorregedoriaMenuPayload(db);
-      } else if (selectedModule === 'module_decorations') { // CORREÇÃO: Adicionar o novo módulo
+      } else if (selectedModule === 'module_decorations') {
         payload = await getDecorationsMenuPayload(db);
+      } else if (selectedModule === 'module_hierarchy') {
+        payload = await getHierarchyMenuPayload(db);
+      } else if (selectedModule === 'module_tags') { // NOVA ALTERAÇÃO ADICIONADA AQUI
+        payload = await getTagsMenuPayload(db);
       } else {
         return await interaction.editReply({ content: '❌ Módulo não encontrado.', components: [] });
       }
       
-
       await interaction.editReply(payload);
+      
     } catch (error) {
       console.error("Erro ao carregar o menu do módulo:", error);
-      await interaction.editReply({ content: '❌ Ocorreu um erro ao carregar o menu. Por favor, tente novamente.', components: [] });
+      await interaction.editReply({ content: '❌ Ocorreu um erro ao carregar o menu do módulo selecionado.' });
     }
   },
 };

@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
+const { updateMemberTag } = require('./utils/tagUpdater.js');
 const path = require('node:path');
 require('dotenv-flow').config();
 
@@ -57,6 +58,13 @@ function loadHandlers(dir) {
         }
     }
 }
+
+client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+    // A função é chamada se os cargos do membro mudarem.
+    if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
+        updateMemberTag(newMember);
+    }
+});
 
 // --- O "CÉREBRO" DO BOT ---
 client.on(Events.InteractionCreate, async (interaction) => {
