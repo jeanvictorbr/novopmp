@@ -24,6 +24,7 @@ const client = new Client({
     ],
 });
 
+// Sistema de Handlers Unificado e Robusto
 client.handlers = new Collection();
 
 async function startBot() {
@@ -44,6 +45,7 @@ function loadHandlers(dir) {
         } else if (file.name.endsWith('.js')) {
             try {
                 const handler = require(fullPath);
+                // A chave de registro é o nome do comando (para /) ou o customId (para componentes)
                 const key = handler.data?.name || handler.customId;
                 if (key) {
                     client.handlers.set(key, handler);
@@ -87,7 +89,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
 });
-
 
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
