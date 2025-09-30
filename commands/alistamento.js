@@ -2,16 +2,22 @@
 
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../database/db.js');
+const { createQuizManagerEmbed } = require('../interactions/handlers/enlistment_quiz_handler.js'); // Importaremos uma nova função
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('alistamento')
-        .setDescription('Comandos do Módulo de Alistamento.')
+        .setDescription('Comandos do Módulo de Alistamento e Provas.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addSubcommand(subcommand =>
             subcommand
                 .setName('painel')
                 .setDescription('Envia o painel público de alistamento.')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('painelprovas')
+                .setDescription('Envia a vitrine pública de provas teóricas.')
         )
         .addSubcommand(subcommand =>
             subcommand
@@ -52,32 +58,50 @@ module.exports = {
             await channel.send({ embeds: [embed], components: [row] });
             await interaction.editReply(`✅ Painel de alistamento enviado com sucesso para ${channel}.`);
         }
+        else if (subcommand === 'painelprovas') {
+            await interaction.deferReply({ ephemeral: true });
+            const channelId = interaction.channel.id; // Envia no canal onde o comando foi usado
+            const channel = await interaction.guild.channels.fetch(channelId);
+
+            const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes");
+
+            const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('🎓 Central de Provas e Certificações')
+                .setDescription('Bem-vindo, oficial! Aqui você pode testar seus conhecimentos e obter certificações. Selecione uma prova no menu abaixo para começar.')
+                .setThumbnail('https://i.imgur.com/ywhAV0k.png');
+
+            if (quizzes.length === 0) {
+                embed.addFields({ name: "Nenhuma prova disponível", value: "Volte mais tarde para verificar novas provas." });
+                await channel.send({ embeds: [embed] });
+            } else {
+                const options = quizzes.map(q => ({
+                    label: q.title,
+                    value: `quiz_public_start_${q.quiz_id}`,
+                    description: `ID da Prova: ${q.quiz_id}`,
+                    emoji: '✍️'
+                }));
+                const row = new ActionRowBuilder().addComponents(
+                    new StringSelectMenuBuilder()
+                        .setCustomId('quiz_public_select')
+                        .setPlaceholder('Selecione uma prova para realizar...')
+                        .addOptions(options)
+                );
+                await channel.send({ embeds: [embed], components: [row] });
+            }
+            await interaction.editReply(`✅ Painel de provas enviado com sucesso neste canal!`);
+        }
         else if (subcommand === 'criaprova') {
             const title = interaction.options.getString('titulo');
             const passingScore = interaction.options.getInteger('nota_minima') || 70;
 
-            // Aqui, apenas iniciamos o processo. A lógica de adicionar perguntas será feita via botões.
             const result = await db.run('INSERT INTO enlistment_quizzes (title, questions, passing_score) VALUES ($1, $2, $3) RETURNING quiz_id', [title, '[]', passingScore]);
             const quizId = result.rows[0].quiz_id;
-
-            const embed = new EmbedBuilder()
-                .setColor('Green')
-                .setTitle(`📝 Prova Criada: ${title}`)
-                .setDescription('A prova foi criada com sucesso! Agora, adicione as perguntas usando o botão abaixo.')
-                .addFields(
-                    { name: 'ID da Prova', value: `\`${quizId}\``, inline: true },
-                    { name: 'Nota Mínima', value: `\`${passingScore}%\``, inline: true }
-                );
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`quiz_add_question_${quizId}`)
-                    .setLabel('Adicionar Pergunta')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('➕')
-            );
             
-            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+            // Agora, usamos a nova função para gerar um painel de gestão dinâmico
+            const { embeds, components } = await createQuizManagerEmbed(quizId);
+            
+            await interaction.reply({ embeds, components, ephemeral: true });
         }
     },
 };
