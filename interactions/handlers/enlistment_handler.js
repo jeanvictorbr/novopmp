@@ -2,37 +2,46 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedB
 const db = require('../../database/db.js');
 const { getEnlistmentMenuPayload, getQuizHubPayload, getQuizManagementPayload } = require('../../views/setup_views.js');
 
-// Mapa para armazenar o estado das provas dos usuários
+// Mapa para armazenar o estado das provas dos usuários (a ser usado no futuro)
 const userQuizStates = new Map();
 
 const enlistmentHandler = {
     customId: (id) => id.startsWith('enlistment_') || id.startsWith('quiz_') || id === 'delete_cancel',
 
     async execute(interaction) {
-        const { customId } = interaction;
-        
-        if (customId === 'delete_cancel') {
-            return await interaction.update({ content: 'Ação cancelada.', components: [], embeds: [] }).catch(() => {});
-        }
-        
-        // --- ROTAS DE CONFIGURAÇÃO (/setup) ---
-        if (customId.startsWith('enlistment_setup_')) return this.handleSetup(interaction);
-        if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
+        try {
+            const { customId } = interaction;
 
-        // --- ROTAS PÚBLICAS (CANDIDATO) ---
-        if (customId === 'enlistment_start_process') return this.handleStartProcess(interaction);
-        if (customId === 'quiz_public_start') return this.startQuiz(interaction);
-        if (customId.startsWith('quiz_answer_')) return this.handleQuizAnswer(interaction);
+            if (customId === 'delete_cancel') {
+                return await interaction.update({ content: 'Ação cancelada.', components: [], embeds: [] }).catch(() => {});
+            }
+            
+            // --- ROTAS DE CONFIGURAÇÃO (/setup) ---
+            if (customId.startsWith('enlistment_setup_')) return this.handleSetup(interaction);
+            if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
 
-        // --- ROTAS DE RECRUTADOR ---
-        if (customId.startsWith('enlistment_approve_') || customId.startsWith('enlistment_reject_')) return this.handleApproval(interaction);
-        
-        // --- MODALS ---
-        if (interaction.isModalSubmit()) {
-            if (customId === 'quiz_admin_create_modal') return this.handleCreateQuizModal(interaction);
-            if (customId.startsWith('quiz_admin_add_question_modal_')) return this.handleAddQuestionModal(interaction);
-            if (customId.startsWith('quiz_admin_edit_question_modal_')) return this.handleEditQuestionModal(interaction);
-            if (customId === 'enlistment_apply_modal') return this.handleEnlistmentModal(interaction);
+            // --- ROTAS PÚBLICAS (CANDIDATO) ---
+            if (customId === 'enlistment_start_process') return this.handleStartProcess(interaction);
+            if (customId === 'quiz_public_start') return this.startQuiz(interaction);
+            if (customId.startsWith('quiz_answer_')) return this.handleQuizAnswer(interaction);
+
+            // --- ROTAS DE RECRUTADOR ---
+            if (customId.startsWith('enlistment_approve_') || customId.startsWith('enlistment_reject_')) return this.handleApproval(interaction);
+            
+            // --- MODALS (FORMULÁRIOS) ---
+            if (interaction.isModalSubmit()) {
+                if (customId === 'quiz_admin_create_modal') return this.handleCreateQuizModal(interaction);
+                if (customId.startsWith('quiz_admin_add_question_modal_')) return this.handleAddQuestionModal(interaction);
+                if (customId.startsWith('quiz_admin_edit_question_modal_')) return this.handleEditQuestionModal(interaction);
+                if (customId === 'enlistment_apply_modal') return this.handleEnlistmentModal(interaction);
+            }
+        } catch (error) {
+            console.error("Erro geral ao processar interação:", error);
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: '❌ Houve um erro crítico ao processar esta ação.', ephemeral: true }).catch(() => {});
+            } else {
+                await interaction.reply({ content: '❌ Houve um erro crítico ao processar esta ação.', ephemeral: true }).catch(() => {});
+            }
         }
     },
 
@@ -72,183 +81,189 @@ const enlistmentHandler = {
         const { customId } = interaction;
         const parts = customId.split('_');
         const action = parts[2];
-        const quizId = parts[3];
 
         if (action === 'create' && parts[3] === 'new') {
-            const modal = new ModalBuilder().setCustomId('quiz_admin_create_modal').setTitle('Criar Nova Prova Teórica');
+            const modal = new ModalBuilder().setCustomId('quiz_admin_create_modal').setTitle('Criar Nova Prova');
             modal.addComponents(
-                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('quiz_title').setLabel("Título da Prova").setStyle(TextInputStyle.Short).setPlaceholder("Ex: Prova Teórica PMERJ").setRequired(true)),
-                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('quiz_passing_score').setLabel("Nota Mínima para Aprovação (%)").setStyle(TextInputStyle.Short).setPlaceholder("Ex: 70 (apenas números)").setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('quiz_title').setLabel("Título da Prova").setStyle(TextInputStyle.Short).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('quiz_passing_score').setLabel("Nota Mínima para Aprovação (%)").setStyle(TextInputStyle.Short).setRequired(true))
             );
             return await interaction.showModal(modal);
         }
-        
+
         if (action === 'back' && parts[3] === 'to' && parts[4] === 'enlistment') {
              const payload = await getEnlistmentMenuPayload(db);
              return await interaction.update(payload);
         }
 
         if (interaction.isStringSelectMenu() && action === 'select' && parts[3] === 'action') {
+            await interaction.deferUpdate();
             const selectedValue = interaction.values[0];
             if (selectedValue === 'quiz_admin_deactivate') {
                 await db.run("DELETE FROM settings WHERE key = 'enlistment_quiz_id'");
                 const payload = await getQuizHubPayload(db);
-                await interaction.update(payload);
-                return await interaction.followUp({ content: '✅ Prova teórica desativada!', ephemeral: true });
-            }
-            if (selectedValue.startsWith('quiz_admin_select_')) {
+                await interaction.editReply(payload);
+            } else if (selectedValue.startsWith('quiz_admin_select_')) {
                 const selectedQuizId = selectedValue.split('_').pop();
                 const payload = await getQuizManagementPayload(db, selectedQuizId);
-                return await interaction.update(payload);
+                await interaction.editReply(payload);
             }
+            return;
         }
         
         if (action === 'activate') {
-            await db.run('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', ['enlistment_quiz_id', quizId]);
-            const payload = await getQuizManagementPayload(db, quizId);
-            await interaction.update(payload);
-            return await interaction.followUp({ content: `✅ Prova ativada com sucesso!`, ephemeral: true });
+            await interaction.deferUpdate();
+            await db.run('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', ['enlistment_quiz_id', parts[3]]);
+            const payload = await getQuizManagementPayload(db, parts[3]);
+            return await interaction.editReply(payload);
         }
         
         if (action === 'add' && parts[3] === 'question') {
             const modal = new ModalBuilder().setCustomId(`quiz_admin_add_question_modal_${parts[4]}`).setTitle('Adicionar Nova Pergunta');
             modal.addComponents(
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado da Pergunta").setStyle(TextInputStyle.Paragraph).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas (uma por linha)").setStyle(TextInputStyle.Paragraph).setPlaceholder("Opção A\nOpção B\nOpção C\n...").setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas (uma por linha)").setStyle(TextInputStyle.Paragraph).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('correct_answer').setLabel("Letra da Alternativa Correta (A, B, C...)").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(1))
             );
             return await interaction.showModal(modal);
         }
 
         if (action === 'edit' && parts[3] === 'question') {
+            const quizId = parts[4];
             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
             const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+            if (questions.length === 0) return interaction.reply({ content: 'Não há perguntas para editar.', ephemeral: true });
+            const options = questions.map((q, index) => ({ label: `Pergunta #${index + 1}: ${q.question.substring(0, 80)}`, value: `${quizId}_${index}` }));
+            const selectMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('quiz_admin_select_question_to_manage').setPlaceholder('Selecione uma pergunta...').addOptions(options));
+            return await interaction.reply({ content: 'Selecione uma pergunta para gerir:', components: [selectMenu], ephemeral: true });
+        }
+        
+        if (interaction.isStringSelectMenu() && customId === 'quiz_admin_select_question_to_manage') {
+            await interaction.deferUpdate();
+            const [selectedQuizId, questionIndex] = interaction.values[0].split('_');
+            const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
+            const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+            const question = questions[questionIndex];
             
-            if (questions.length === 0) {
-                 return interaction.reply({ content: 'Não há perguntas para editar nesta prova.', ephemeral: true });
-            }
-
-            const options = questions.map((q, index) => ({
-                label: `Pergunta #${index + 1}: ${q.question.substring(0, 80)}`,
-                value: `edit_question_${quizId}_${index}`,
-                description: `Resposta Correta: ${q.correct}`
-            }));
-            const selectMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('quiz_admin_select_question_to_edit').setPlaceholder('Selecione uma pergunta para editar...').addOptions(options));
-            return await interaction.reply({ content: 'Selecione uma pergunta abaixo:', components: [selectMenu], ephemeral: true });
+            const embed = new EmbedBuilder().setColor("Yellow").setTitle(`Gerindo Pergunta #${parseInt(questionIndex, 10) + 1}`).setDescription(question.question);
+            const buttons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`quiz_admin_open_edit_modal_${selectedQuizId}_${questionIndex}`).setLabel("Editar Pergunta").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`quiz_admin_delete_question_${selectedQuizId}_${questionIndex}`).setLabel("Apagar Pergunta").setStyle(ButtonStyle.Danger)
+            );
+            return await interaction.editReply({ embeds: [embed], components: [buttons] });
+        }
+        
+        if (action === 'open' && parts[3] === 'edit' && parts[4] === 'modal') {
+            const [,,,, selectedQuizId, questionIndex] = parts;
+            const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
+            const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+            const questionData = questions[questionIndex];
+            const modal = new ModalBuilder().setCustomId(`quiz_admin_edit_question_modal_${selectedQuizId}_${questionIndex}`).setTitle(`Editando Pergunta #${parseInt(questionIndex, 10) + 1}`);
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado").setStyle(TextInputStyle.Paragraph).setValue(questionData.question).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas").setStyle(TextInputStyle.Paragraph).setValue(questionData.options.join('\n')).setRequired(true)),
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('correct_answer').setLabel("Letra Correta").setStyle(TextInputStyle.Short).setValue(questionData.correct).setRequired(true).setMaxLength(1))
+            );
+            return await interaction.showModal(modal);
         }
 
-        if (interaction.isStringSelectMenu() && customId === 'quiz_admin_select_question_to_edit') {
-             const [,,, selectedQuizId, questionIndex] = interaction.values[0].split('_');
-             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
-             const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
-             const questionData = questions[questionIndex];
-             
-             const modal = new ModalBuilder().setCustomId(`quiz_admin_edit_question_modal_${selectedQuizId}_${questionIndex}`).setTitle(`Editando Pergunta #${parseInt(questionIndex, 10) + 1}`);
-             modal.addComponents(
-                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado").setStyle(TextInputStyle.Paragraph).setValue(questionData.question).setRequired(true)),
-                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas").setStyle(TextInputStyle.Paragraph).setValue(questionData.options.join('\n')).setRequired(true)),
-                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('correct_answer').setLabel("Letra Correta").setStyle(TextInputStyle.Short).setValue(questionData.correct).setRequired(true).setMaxLength(1))
-             );
-             return await interaction.showModal(modal);
+        if (action === 'delete' && parts[3] === 'question') {
+            await interaction.deferUpdate();
+            const [,,,, selectedQuizId, questionIndex] = parts;
+            const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [selectedQuizId]);
+            const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
+            questions.splice(questionIndex, 1);
+            await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), selectedQuizId]);
+            
+            const payload = await getQuizManagementPayload(db, selectedQuizId);
+            return await interaction.editReply(payload);
         }
 
         if (action === 'delete' && parts[3] === 'quiz') {
-            const confirmButton = new ButtonBuilder().setCustomId(`quiz_admin_delete_confirm_${quizId}`).setLabel('Sim, Apagar').setStyle(ButtonStyle.Danger);
+            const confirmButton = new ButtonBuilder().setCustomId(`quiz_admin_delete_confirm_${parts[4]}`).setLabel('Sim, Apagar Prova').setStyle(ButtonStyle.Danger);
             const cancelButton = new ButtonBuilder().setCustomId('delete_cancel').setLabel('Cancelar').setStyle(ButtonStyle.Secondary);
             const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-            return await interaction.reply({ content: `⚠️ **Atenção!** Tem a certeza de que deseja apagar esta prova?`, components: [row], ephemeral: true });
+            return await interaction.reply({ content: `⚠️ **Atenção!** Deseja apagar esta prova permanentemente?`, components: [row], ephemeral: true });
         }
         
         if (action === 'delete' && parts[3] === 'confirm') {
-            await db.run('DELETE FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-            await db.run("DELETE FROM settings WHERE key = 'enlistment_quiz_id' AND value = $1", [quizId]);
+            await interaction.deferUpdate();
+            const quizIdToDelete = parts[4];
+            await db.run('DELETE FROM enlistment_quizzes WHERE quiz_id = $1', [quizIdToDelete]);
+            await db.run("DELETE FROM settings WHERE key = 'enlistment_quiz_id' AND value = $1", [quizIdToDelete]);
             const payload = await getQuizHubPayload(db);
-            return await interaction.update(payload);
+            return await interaction.editReply(payload);
         }
     },
-
+    
     async handleCreateQuizModal(interaction) {
-        await interaction.deferUpdate(); // Apenas adia, não responde
+        await interaction.deferReply({ ephemeral: true });
         const title = interaction.fields.getTextInputValue('quiz_title');
         const passingScore = parseInt(interaction.fields.getTextInputValue('quiz_passing_score'), 10);
 
         if (isNaN(passingScore) || passingScore < 0 || passingScore > 100) {
-            return interaction.followUp({ content: '❌ A nota mínima deve ser um número entre 0 e 100.', ephemeral: true });
+            return await interaction.editReply({ content: '❌ A nota mínima deve ser um número entre 0 e 100.' });
         }
-
         await db.run('INSERT INTO enlistment_quizzes (title, passing_score, questions) VALUES ($1, $2, $3)', [title, passingScore, '[]']);
         
-        // Agora que a DB está atualizada, editamos a mensagem original
         const payload = await getQuizHubPayload(db);
-        await interaction.message.edit(payload);
-        
-        // E enviamos uma confirmação efêmera para o admin
-        return await interaction.followUp({ content: `✅ Prova "${title}" criada com sucesso!`, ephemeral: true });
+        await interaction.message.edit(payload); // Edita a mensagem original do Hub
+        await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso!` }); // Confirma para o admin
     },
 
     async handleAddQuestionModal(interaction) {
-        await interaction.deferUpdate();
+        await interaction.deferReply({ ephemeral: true });
         const quizId = interaction.customId.split('_').pop();
-        
         try {
             const questionText = interaction.fields.getTextInputValue('question_text');
             const optionsText = interaction.fields.getTextInputValue('options');
             const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
             const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
 
-            if (options.length < 2) return await interaction.followUp({ content: '❌ Pelo menos duas alternativas são necessárias.', ephemeral: true });
-
+            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
             const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
-            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.followUp({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.`, ephemeral: true });
+            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
 
             const newQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
-
             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
             const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
             questions.push(newQuestion);
-
             await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), quizId]);
             
             const payload = await getQuizManagementPayload(db, quizId);
             await interaction.message.edit(payload);
-            return await interaction.followUp({ content: '✅ Pergunta adicionada com sucesso!', ephemeral: true });
+            await interaction.editReply({ content: '✅ Pergunta adicionada com sucesso!' });
         } catch (error) {
             console.error("Erro ao adicionar pergunta:", error);
-            return await interaction.followUp({ content: '❌ Ocorreu um erro ao salvar a pergunta.', ephemeral: true });
+            await interaction.editReply({ content: '❌ Ocorreu um erro ao salvar a pergunta.' });
         }
     },
 
     async handleEditQuestionModal(interaction) {
-        await interaction.deferUpdate();
+        await interaction.deferReply({ ephemeral: true });
         const [,,, quizId, questionIndex] = interaction.customId.split('_');
-        
         try {
             const questionText = interaction.fields.getTextInputValue('question_text');
             const optionsText = interaction.fields.getTextInputValue('options');
             const correctAnswerLetter = interaction.fields.getTextInputValue('correct_answer').toUpperCase();
             const options = optionsText.split('\n').filter(opt => opt.trim() !== '');
 
-            if (options.length < 2) return await interaction.followUp({ content: '❌ Pelo menos duas alternativas são necessárias.', ephemeral: true });
-            
+            if (options.length < 2) return await interaction.editReply({ content: '❌ Pelo menos duas alternativas são necessárias.' });
             const correctIndex = correctAnswerLetter.charCodeAt(0) - 65;
-            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.followUp({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.`, ephemeral: true });
+            if (correctIndex < 0 || correctIndex >= options.length) return await interaction.editReply({ content: `❌ A resposta correta ('${correctAnswerLetter}') é inválida.` });
 
             const updatedQuestion = { question: questionText, options: options, correct: correctAnswerLetter };
-
             const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
             const questions = typeof quiz.questions === 'string' ? JSON.parse(quiz.questions) : (quiz.questions || []);
             questions[questionIndex] = updatedQuestion;
-
             await db.run('UPDATE enlistment_quizzes SET questions = $1 WHERE quiz_id = $2', [JSON.stringify(questions), quizId]);
             
             const payload = await getQuizManagementPayload(db, quizId);
-            // A interação de um modal não tem uma "mensagem" para editar.
-            // O admin terá que reabrir o painel para ver a mudança.
-            // Apenas confirmamos a ação.
-            return await interaction.followUp({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada! O painel será atualizado da próxima vez que for aberto.`, ephemeral: true });
+            await interaction.message.edit(payload);
+            await interaction.editReply({ content: `✅ Pergunta #${parseInt(questionIndex, 10) + 1} atualizada!` });
         } catch (error) {
             console.error("Erro ao editar pergunta:", error);
-            return await interaction.followUp({ content: '❌ Ocorreu um erro ao salvar as alterações.', ephemeral: true });
+            await interaction.editReply({ content: '❌ Ocorreu um erro ao salvar as alterações.' });
         }
     },
 
@@ -320,7 +335,7 @@ const enlistmentHandler = {
 
         const request = await db.get('SELECT * FROM enlistment_requests WHERE request_id = $1', [requestId]);
         if (!request || request.status !== 'pending') {
-            return; // Ação já processada, simplesmente ignora.
+            return;
         }
 
         const candidate = await interaction.guild.members.fetch(request.user_id).catch(() => null);
