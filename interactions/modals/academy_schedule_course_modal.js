@@ -1,11 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
-const db = require('../../../database/db.js');
-const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
-const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../../views/setup_views.js');
+// CORREÇÃO: O caminho foi ajustado de '../../../' para '../../' para encontrar a pasta correta.
+const db = require('../../database/db.js');
+const { updateAcademyPanel } = require('../../utils/updateAcademyPanel.js');
+const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../views/setup_views.js');
 
 module.exports = {
-  // CORREÇÃO: Mudado de função para string estática para sser encontrado pelo novo index.js
-  customId: 'academy_schedule_course_modal',
+  customId: (id) => id.startsWith('academy_schedule_course_modal'), // Ajustado para lidar com IDs dinâmicos, se necessário
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
