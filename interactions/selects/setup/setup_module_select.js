@@ -20,12 +20,13 @@ module.exports = {
         payload = await getDecorationsMenuPayload(db);
       } else if (selectedModule === 'module_hierarchy') {
         payload = await getHierarchyMenuPayload(db);
-      } else if (selectedModule === 'module_enlistment') { // Adicione este bloco
+      } else if (selectedModule === 'module_enlistment') {
         payload = await getEnlistmentMenuPayload(db);
       } else if (selectedModule === 'module_tags') {
-        // CORREÇÃO: Passa o objeto 'interaction.guild' para a função.
         payload = await getTagsMenuPayload(db, interaction.guild);
-      } else {
+      }
+      // A opção 'module_achievements' foi removida daqui
+      else {
         return await interaction.editReply({ content: '❌ Módulo não encontrado.', components: [] });
       }
       

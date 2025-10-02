@@ -179,6 +179,22 @@ const schemaSQL = `
         role_id VARCHAR(255) NOT NULL,
         promoted_at BIGINT NOT NULL
     );
+        -- NOVAS TABELAS PARA O MÓDULO DE CONQUISTAS --
+    CREATE TABLE IF NOT EXISTS achievements (
+        achievement_id TEXT PRIMARY KEY, -- Um ID curto, ex: "patrol_100"
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        icon TEXT, -- Emoji ou URL de uma imagem pequena
+        type TEXT NOT NULL, -- 'patrol_hours', 'recruits', 'courses', etc.
+        requirement INTEGER NOT NULL -- O valor a ser atingido (ex: 100 para horas, 10 para recrutas)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_achievements (
+        user_id VARCHAR(255) NOT NULL,
+        achievement_id TEXT NOT NULL REFERENCES achievements(achievement_id) ON DELETE CASCADE,
+        unlocked_at BIGINT NOT NULL,
+        PRIMARY KEY (user_id, achievement_id)
+    );
 `;
 async function initializeDatabase() {
     try {

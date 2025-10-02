@@ -533,6 +533,7 @@ async function getQuizManagementPayload(db, quizId) {
     return { embeds: [embed], components };
 }
 
+
 module.exports = {
   getMainMenuPayload,
   getCopomMenuPayload,
