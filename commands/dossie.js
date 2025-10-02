@@ -37,9 +37,12 @@ async function generateDossieEmbed(targetUser, guild) {
     `, [userId]);
     let decorationsText = decorations.map(d => `> ${d.emoji || '🏆'} **${d.name}** em <t:${d.awarded_at}:d>\n> Concedida por: <@${d.awarded_by}>`).join('\n\n') || '`Nenhuma condecoração recebida.`';
     
-    // --- NOVO: HISTÓRICO DE PROMOÇÕES ---
-    const promotions = await db.all('SELECT role_id, promoted_at FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
-    let promotionsText = promotions.map(p => `> ⬆️ Promovido a <@&${p.role_id}>\n> Em: <t:${p.promoted_at}:F>`).join('\n\n') || '`Nenhum histórico de promoção registado.`';
+    // --- HISTÓRICO DE PROMOÇÕES (COM CORREÇÃO) ---
+    const promotions = await db.all('SELECT role_id, promoted_at, promoted_by FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
+    let promotionsText = promotions.map(p => {
+        const promoter = p.promoted_by ? `| Promovido por: <@${p.promoted_by}>` : '';
+        return `> ⬆️ Promovido a <@&${p.role_id}>\n> Em: <t:${p.promoted_at}:F> ${promoter}`;
+    }).join('\n\n') || '`Nenhum histórico de promoção registado.`';
 
 
     // --- HISTÓRICO DISCIPLINAR ---
@@ -60,7 +63,6 @@ async function generateDossieEmbed(targetUser, guild) {
         .setThumbnail(targetUser.displayAvatarURL())
         .addFields(
             { name: 'Resumo de Serviço', value: `**Patrulha:** \`${formattedTotalTime}\` | **Cursos:** \`${certifications.length}\` | **Recrutamentos:** \`${totalRecruits}\` | **Promoções:** \`${promotions.length}\` | **Medalhas:** \`${decorations.length}\` | **Sanções:** \`${sanctions.length}\`` },
-            // Adicionado novo campo para o histórico de promoções
             { name: '📈 Histórico de Promoções', value: promotionsText },
             { name: '🎓 Certificações da Academia', value: coursesText },
             { name: '🏆 Condecorações e Honrarias', value: decorationsText },

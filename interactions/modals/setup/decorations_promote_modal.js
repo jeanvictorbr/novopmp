@@ -17,18 +17,16 @@ module.exports = {
         }
 
         try {
-            // Ação principal: Adicionar o novo cargo ao oficial
             await officer.roles.add(newRole);
 
-            // --- NOVA INTEGRAÇÃO ---
-            // Adiciona um registo ao histórico de carreira do oficial
+            // --- CORREÇÃO APLICADA AQUI ---
+            // Adiciona um registo ao histórico de carreira do oficial, incluindo quem o promoveu.
             const promotionTimestamp = Math.floor(Date.now() / 1000);
             await db.run(
-                'INSERT INTO rank_history (user_id, role_id, promoted_at) VALUES ($1, $2, $3)',
-                [userId, newRoleId, promotionTimestamp]
+                'INSERT INTO rank_history (user_id, role_id, promoted_at, promoted_by) VALUES ($1, $2, $3, $4)',
+                [userId, newRoleId, promotionTimestamp, interaction.user.id]
             );
-            // --- FIM DA INTEGRAÇÃO ---
-
+            
             const channelId = (await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'"))?.value;
             if (channelId) {
                 const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
@@ -58,11 +56,11 @@ module.exports = {
                     await announcementMessage.react('✅');
                 }
             }
-            await interaction.editReply(`✅ **${officer.displayName}** foi promovido para **${newRole.name}**! O anúncio foi publicado e o histórico de carreira foi atualizado.`);
+            await interaction.editReply(`✅ **${officer.displayName}** foi promovido para **${newRole.name}**! O anúncio foi publicado.`);
             
         } catch (error) {
             console.error('Erro ao promover:', error);
-            await interaction.editReply('❌ Ocorreu um erro ao executar a promoção. Verifique as minhas permissões.');
+            await interaction.editReply('❌ Ocorreu um erro ao executar a promoção. Verifique minhas permissões.');
         }
     }
 };
