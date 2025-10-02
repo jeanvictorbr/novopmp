@@ -194,7 +194,7 @@ const schemaSQL = `
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         role_id VARCHAR(255) NOT NULL,
-        promoted_at BIGINT NOT NULL
+        promoted_at BIGINT NOT NULL,
         promoted_by VARCHAR(255) -- NOVA COLUNA ADICIONADA
     );
 `;
