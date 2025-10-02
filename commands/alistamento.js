@@ -26,8 +26,8 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle('🎓 Central de Provas Teóricas')
-                .setDescription('Para prosseguir com o seu alistamento, você deve primeiro ser aprovado na prova teórica. Selecione a prova designada abaixo para começar.')
-                .setThumbnail('https://i.imgur.com/ywhAV0k.png');
+                .setDescription('`Para prosseguir com o seu alistamento, você deve primeiro ser aprovado na prova teórica. Selecione a prova designada abaixo para começar.`')
+                .setThumbnail('https://media.tenor.com/UXdtXhsNMFkAAAAj/writing-om-nom.gif');
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
