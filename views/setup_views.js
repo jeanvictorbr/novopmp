@@ -91,7 +91,8 @@ async function getCopomTeamsMenuPayload(db) {
 
 async function getAcademyMenuPayload(db) {
     const courses = await db.all('SELECT * FROM academy_courses');
-    const settings = await db.all("SELECT key, value FROM settings WHERE key IN ('academy_channel_id', 'academy_logs_channel_id')");
+    // CORREÇÃO: Adicionado 'academy_discussion_channel_id' à query
+    const settings = await db.all("SELECT key, value FROM settings WHERE key IN ('academy_channel_id', 'academy_logs_channel_id', 'academy_discussion_channel_id')");
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
     
     const embed = new EmbedBuilder()
@@ -101,7 +102,9 @@ async function getAcademyMenuPayload(db) {
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFields(
             { name: 'Canal de Estudos (Painel Público)', value: settingsMap.has('academy_channel_id') ? `<#${settingsMap.get('academy_channel_id')}>` : '`Não definido`', inline: false },
-            { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false }
+            { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false },
+            // CORREÇÃO: Adicionado o campo de status para o canal de discussões
+            { name: 'Canal de Discussões (para Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`❌ NÃO DEFINIDO`', inline: false }
         )
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
     
@@ -114,7 +117,7 @@ async function getAcademyMenuPayload(db) {
     const scheduleButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_schedule_waiting_list').setLabel('Agendar p/ Lista de Espera').setStyle(ButtonStyle.Primary).setEmoji('🗓️'),
         new ButtonBuilder().setCustomId('academy_schedule_independent').setLabel('Agendar Aula Avulsa').setStyle(ButtonStyle.Primary).setEmoji('📅'),
-        new ButtonBuilder().setCustomId('academy_manage_events').setLabel('Gerenciar Aulas Agendadas').setStyle(ButtonStyle.Secondary).setEmoji('🔧') // NOVO BOTÃO
+        new ButtonBuilder().setCustomId('academy_manage_events').setLabel('Gerenciar Aulas Agendadas').setStyle(ButtonStyle.Secondary).setEmoji('🔧')
     );
 
     const certificationButtons = new ActionRowBuilder().addComponents(
@@ -124,10 +127,24 @@ async function getAcademyMenuPayload(db) {
     const configButtons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
+        // CORREÇÃO: Adicionado o botão para configurar o canal de discussões
+        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
 
-    return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons] };
+    // CORREÇÃO: O ActionRowBuilder só suporta 5 botões, então tive de separar
+    const finalButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+    );
+
+    const configButtons1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
+    );
+
+
+    return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons1, finalButtons] };
 }
 
 async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
