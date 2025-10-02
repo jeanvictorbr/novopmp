@@ -315,9 +315,17 @@ async function getCareerRequirementsMenuPayload(db, guild) {
     if (requirements.length > 0) {
         let reqList = '';
         for (const req of requirements) {
-            const prevRole = await guild.roles.fetch(req.previous_role_id).catch(() => ({ name: 'Cargo Apagado' }));
-            const newRole = await guild.roles.fetch(req.role_id).catch(() => ({ name: 'Cargo Apagado' }));
-            reqList += `**De:** ${prevRole.name} **Para:** ${newRole.name}\n`;
+            // --- INÍCIO DA CORREÇÃO ---
+            // Alterado de guild.roles.fetch() para guild.roles.cache.get()
+            // que é mais rápido e fiável para este caso de uso.
+            const prevRole = guild.roles.cache.get(req.previous_role_id);
+            const newRole = guild.roles.cache.get(req.role_id);
+            
+            const prevRoleName = prevRole ? prevRole.name : 'Cargo Apagado';
+            const newRoleName = newRole ? newRole.name : 'Cargo Apagado';
+            // --- FIM DA CORREÇÃO ---
+
+            reqList += `**De:** ${prevRoleName} **Para:** ${newRoleName}\n`;
             reqList += `> Horas: \`${req.required_patrol_hours}\` | Cursos: \`${req.required_courses}\` | Recrutas: \`${req.required_recruits}\` | Dias no Cargo: \`${req.required_time_in_rank_days}\`\n\n`;
         }
         embed.addFields({ name: 'Progressões Configuradas', value: reqList });
