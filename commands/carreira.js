@@ -52,7 +52,7 @@ module.exports = {
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
 
-            // --- CORREÇÃO APLICADA AQUI ---
+            // --- INTEGRAÇÃO COM ADMINSTATS ---
             const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [targetUser.id]);
             
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
@@ -66,10 +66,10 @@ module.exports = {
 
             const recruitsData = await db.get("SELECT COUNT(*) AS total FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [targetUser.id]);
             const currentRecruits = (recruitsData?.total || 0) + (manualStats?.manual_recruits || 0);
-            // --- FIM DA CORREÇÃO ---
 
             const lastPromotion = await db.get('SELECT promoted_at FROM rank_history WHERE user_id = $1 AND role_id = $2 ORDER BY promoted_at DESC LIMIT 1', [targetUser.id, highestCareerRole.id]);
             let currentTimeInRankDays = lastPromotion ? Math.floor((now - lastPromotion.promoted_at) / 86400) : 0;
+            // --- FIM DA INTEGRAÇÃO ---
 
             const embed = new EmbedBuilder()
                 .setColor('Blue')
