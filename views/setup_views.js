@@ -517,6 +517,13 @@ async function getCareerRequirementsMenuPayload(db, interaction) {
 }
 
 async function getAchievementsMenuPayload(db) {
+    // Centraliza as definições para garantir consistência
+    const achievementTypes = {
+        'patrol_hours': { name: 'Horas de Patrulha', unit: 'Horas' },
+        'recruits': { name: 'Recrutas Aprovados', unit: 'Recrutas' },
+        'courses': { name: 'Cursos Concluídos', unit: 'Cursos' }
+    };
+
     const achievements = await db.all('SELECT * FROM achievements ORDER BY type, requirement ASC');
     const embed = new EmbedBuilder()
         .setColor('Gold')
@@ -527,13 +534,17 @@ async function getAchievementsMenuPayload(db) {
 
     if (achievements.length > 0) {
         const achievementsByType = achievements.reduce((acc, ach) => {
-            if (!acc[ach.type]) acc[ach.type] = [];
-            acc[ach.type].push(`> **${ach.name}** - Requisito: \`${ach.requirement}\``);
+            const typeName = achievementTypes[ach.type]?.name || ach.type;
+            if (!acc[typeName]) {
+                acc[typeName] = [];
+            }
+            const unit = achievementTypes[ach.type]?.unit || '';
+            acc[typeName].push(`> **${ach.name}** - Requisito: \`${ach.requirement} ${unit}\``);
             return acc;
         }, {});
 
-        for (const type in achievementsByType) {
-            embed.addFields({ name: `Tipo: ${type}`, value: achievementsByType[type].join('\n') });
+        for (const typeName in achievementsByType) {
+            embed.addFields({ name: `Tipo: ${typeName}`, value: achievementsByType[typeName].join('\n') });
         }
     } else {
         embed.addFields({ name: 'Conquistas Configuradas', value: '`Nenhuma conquista foi criada ainda.`' });

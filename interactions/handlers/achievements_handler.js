@@ -1,6 +1,12 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js'); // CORRIGIDO AQUI
 const db = require('../../database/db.js');
-const { getAchievementsMenuPayload } = require('../../views/setup_views.js');
+
+// Centraliza as definições dos tipos de conquista para fácil reutilização
+const achievementTypes = {
+    'patrol_hours': { name: 'Horas de Patrulha', unit: 'Horas' },
+    'recruits': { name: 'Recrutas Aprovados', unit: 'Recrutas' },
+    'courses': { name: 'Cursos Concluídos', unit: 'Cursos' }
+};
 
 const achievementHandler = {
     customId: (id) => id.startsWith('achievements_'),
@@ -8,8 +14,12 @@ const achievementHandler = {
     async execute(interaction) {
         const { customId } = interaction;
         try {
-            if (customId === 'achievements_add') return await this.showAddModal(interaction);
-            if (customId === 'achievements_add_modal') return await this.handleAddModal(interaction);
+            // FLUXO DE ADICIONAR
+            if (customId === 'achievements_add') return await this.startAddFlow(interaction);
+            if (customId === 'achievements_type_select') return await this.showAddModal(interaction);
+            if (customId.startsWith('achievements_add_modal_')) return await this.handleAddModal(interaction);
+            
+            // FLUXO DE REMOVER
             if (customId === 'achievements_remove') return await this.showRemoveSelect(interaction);
             if (customId === 'achievements_remove_select') return await this.handleRemoveSelect(interaction);
 
@@ -18,54 +28,51 @@ const achievementHandler = {
         }
     },
 
+    // Etapa 1 do Fluxo de Adicionar: Selecionar o Tipo
+    async startAddFlow(interaction) {
+        const typeOptions = Object.entries(achievementTypes).map(([id, { name }]) => ({
+            label: name,
+            value: id
+        }));
+
+        const menu = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('achievements_type_select')
+                .setPlaceholder('Selecione o tipo de conquista a criar...')
+                .addOptions(typeOptions)
+        );
+
+        await interaction.reply({ content: '**Passo 1 de 2:** Qual o tipo de requisito para a nova conquista?', components: [menu], ephemeral: true });
+    },
+    
+    // Etapa 2 do Fluxo de Adicionar: Preencher o Formulário
     async showAddModal(interaction) {
-        const modal = new ModalBuilder().setCustomId('achievements_add_modal').setTitle('Criar Nova Conquista');
-        
-        const typeOptions = [
-            { label: 'Horas de Patrulha', value: 'patrol_hours' },
-            { label: 'Recrutas Aprovados', value: 'recruits' },
-            { label: 'Cursos Concluídos', value: 'courses' }
-        ];
+        const type = interaction.values[0];
+        const typeName = achievementTypes[type]?.name || 'Desconhecido';
+
+        const modal = new ModalBuilder()
+            .setCustomId(`achievements_add_modal_${type}`)
+            .setTitle(`Nova Conquista: ${typeName}`);
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_id').setLabel("ID da Conquista (curto, sem espaços)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: patrol_100')),
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_name').setLabel("Nome da Conquista").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: Patrulheiro Dedicado')),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_desc').setLabel("Descrição").setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('Ex: Completou 100 horas de patrulha.')),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_icon').setLabel("Ícone (Emoji)").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('Ex: 🏆')),
-            new ActionRowBuilder().addComponents(
-                new StringSelectMenuBuilder()
-                    .setCustomId('ach_type_select') // Este será processado dentro do modal handler
-                    .setPlaceholder('Selecione o Tipo de Requisito')
-                    .addOptions(typeOptions)
-            ),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_req').setLabel("Requisito Numérico").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: 100'))
-        );
-        
-        // StringSelectMenu não é suportado em Modals, vamos apresentar de forma diferente.
-        const modalUpdated = new ModalBuilder().setCustomId('achievements_add_modal').setTitle('Criar Nova Conquista');
-         modalUpdated.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_id').setLabel("ID da Conquista (curto, sem espaços)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: patrol_100')),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_name').setLabel("Nome da Conquista").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: Patrulheiro Dedicado')),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_desc').setLabel("Descrição").setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('Ex: Completou 100 horas de patrulha.')),
-             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_type').setLabel("Tipo (patrol_hours, recruits, courses)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Escolha um dos tipos válidos')),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_req').setLabel("Requisito Numérico").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: 100'))
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_desc').setLabel("Descrição").setStyle(TextInputStyle.Paragraph).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('ach_req').setLabel(`Requisito Numérico (${achievementTypes[type]?.unit})`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('Ex: 100'))
         );
 
-        await interaction.showModal(modalUpdated);
+        await interaction.showModal(modal);
     },
 
     async handleAddModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
+        const type = interaction.customId.split('_').pop();
+        
         const id = interaction.fields.getTextInputValue('ach_id').toLowerCase();
         const name = interaction.fields.getTextInputValue('ach_name');
         const description = interaction.fields.getTextInputValue('ach_desc');
-        const type = interaction.fields.getTextInputValue('ach_type').toLowerCase();
         const requirement = parseInt(interaction.fields.getTextInputValue('ach_req'));
 
-        const validTypes = ['patrol_hours', 'recruits', 'courses'];
-        if (!validTypes.includes(type)) {
-            return await interaction.editReply(`❌ Tipo inválido. Use um dos seguintes: ${validTypes.join(', ')}`);
-        }
         if (isNaN(requirement) || requirement <= 0) {
             return await interaction.editReply('❌ O requisito numérico deve ser um número maior que zero.');
         }
@@ -75,9 +82,14 @@ const achievementHandler = {
                 'INSERT INTO achievements (achievement_id, name, description, type, requirement) VALUES ($1, $2, $3, $4, $5)',
                 [id, name, description, type, requirement]
             );
-            await interaction.editReply('✅ Conquista criada com sucesso! O painel será atualizado quando voltares.');
+            
+            // Atualiza a mensagem original do painel para refletir a nova adição
+            const payload = await require('../../views/setup_views.js').getAchievementsMenuPayload(db, interaction);
+            await interaction.message.edit(payload);
+            await interaction.editReply({content: '✅ Conquista criada com sucesso!', components: []});
+
         } catch (error) {
-            if (error.code === '23505') { // Chave primária duplicada
+            if (error.code === '23505') {
                 await interaction.editReply(`❌ Já existe uma conquista com o ID \`${id}\`. Por favor, escolhe um ID único.`);
             } else {
                 console.error(error);
@@ -106,10 +118,13 @@ const achievementHandler = {
     },
     
     async handleRemoveSelect(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferUpdate();
         const achievementIdToRemove = interaction.values[0];
         await db.run('DELETE FROM achievements WHERE achievement_id = $1', [achievementIdToRemove]);
-        await interaction.editReply({ content: '✅ Conquista removida com sucesso!', components: [] });
+        
+        // Atualiza o painel para refletir a remoção
+        const payload = await require('../../views/setup_views.js').getAchievementsMenuPayload(db, interaction);
+        await interaction.editReply(payload);
     }
 };
 
