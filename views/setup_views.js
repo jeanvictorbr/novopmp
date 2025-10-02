@@ -104,7 +104,7 @@ async function getAcademyMenuPayload(db) {
             { name: 'Canal de Estudos (Painel Público)', value: settingsMap.has('academy_channel_id') ? `<#${settingsMap.get('academy_channel_id')}>` : '`Não definido`', inline: false },
             { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false },
             // CORREÇÃO: Adicionado o campo de status para o canal de discussões
-            { name: 'Canal de Discussões (para Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`❌ NÃO DEFINIDO`', inline: false }
+            { name: 'Canal de Discussões (para Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`❌ NÃO DEFINIDO - Obrigatório para criar cursos`', inline: false }
         )
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
     
@@ -124,27 +124,19 @@ async function getAcademyMenuPayload(db) {
         new ButtonBuilder().setCustomId('academy_certify_official').setLabel('Gerenciar & Certificar Turmas').setStyle(ButtonStyle.Success).setEmoji('🎖️').setDisabled(courses.length === 0)
     );
     
-    const configButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
-        // CORREÇÃO: Adicionado o botão para configurar o canal de discussões
-        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
-    );
-
-    // CORREÇÃO: O ActionRowBuilder só suporta 5 botões, então tive de separar
-    const finalButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
-    );
-
+    // CORREÇÃO: Botões de configuração reorganizados em duas linhas para acomodar o novo botão
     const configButtons1 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('academy_set_discussion_channel').setLabel('Definir Canal de Discussões').setStyle(ButtonStyle.Secondary)
+    );
+
+    const configButtons2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
 
 
-    return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons1, finalButtons] };
+    return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons1, configButtons2] };
 }
 
 async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
