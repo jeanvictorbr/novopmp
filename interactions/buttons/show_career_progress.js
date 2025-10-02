@@ -2,11 +2,32 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const db = require('../../database/db.js');
 
 // --- Funções Visuais (reutilizadas do comando /carreira) ---
-const createProgressBar = (current, required) => { /* ... (código da barra de progresso) ... */ };
-const formatProgress = (current, required) => { /* ... (código de formatação) ... */ };
-async function getHighestCareerRole(member) { /* ... (código para encontrar o cargo) ... */ };
+const createProgressBar = (current, required) => {
+    const totalBlocks = 12;
+    if (required <= 0) return `[${'🟩'.repeat(totalBlocks)}] 100%`;
+    const percentage = Math.min(100, Math.floor((current / required) * 100));
+    const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+    const emptyBlocks = totalBlocks - filledBlocks;
+    let barColor = percentage >= 100 ? '🟩' : (percentage >= 50 ? '🟨' : '🟥');
+    return `[${barColor.repeat(filledBlocks)}${'⬛'.repeat(emptyBlocks)}] ${percentage}%`;
+};
 
-// Cole as 3 funções auxiliares do ficheiro carreira.js aqui para garantir que são idênticas
+const formatProgress = (current, required) => {
+    const emoji = current >= required ? '✅' : '❌';
+    const bar = createProgressBar(current, required);
+    return `${emoji} \`${current} / ${required}\`\n${bar}`;
+};
+
+async function getHighestCareerRole(member) {
+    const allRequirements = await db.all('SELECT role_id, previous_role_id FROM rank_requirements');
+    const careerRoleIds = new Set([...allRequirements.map(r => r.role_id), ...allRequirements.map(r => r.previous_role_id)]);
+    return member.roles.cache
+        .filter(role => careerRoleIds.has(role.id))
+        .sort((a, b) => b.position - a.position)
+        .first();
+}
+// --- Fim das Funções Visuais ---
+
 
 module.exports = {
     customId: 'show_career_progress',
@@ -18,14 +39,25 @@ module.exports = {
 
         try {
             const highestCareerRole = await getHighestCareerRole(member);
-            if (!highestCareerRole) { /* ... (código de erro) ... */ }
+            
+            // --- CORREÇÃO APLICADA AQUI ---
+            if (!highestCareerRole) {
+                return await interaction.editReply({ 
+                    content: 'O seu cargo atual não faz parte de uma progressão de carreira configurada. Por isso, não há um "Status de Upamento" para mostrar.', 
+                    embeds: [], 
+                    components: [] 
+                });
+            }
+            // --- FIM DA CORREÇÃO ---
+
             const nextRankRequirement = await db.get('SELECT * FROM rank_requirements WHERE previous_role_id = $1', [highestCareerRole.id]);
-            if (!nextRankRequirement) { /* ... (código de erro) ... */ }
+            if (!nextRankRequirement) {
+                return await interaction.editReply({ content: `O seu cargo atual (${highestCareerRole.name}) não possui uma próxima etapa de carreira configurada.`, embeds: [], components: [] });
+            }
 
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
 
-            // --- CORREÇÃO APLICADA AQUI ---
             const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [targetUser.id]);
             
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
@@ -57,7 +89,13 @@ module.exports = {
                 .setTimestamp()
                 .setFooter({ text: 'Continue o bom trabalho, oficial!' });
             
-            const backButton = new ActionRowBuilder().addComponents( /* ... (botão voltar) ... */ );
+            const backButton = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('back_to_dossier')
+                    .setLabel('Voltar ao Dossiê')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji('⬅️')
+            );
 
             await interaction.editReply({ embeds: [embed], components: [backButton] });
 

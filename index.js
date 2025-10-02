@@ -93,6 +93,7 @@ client.once(Events.ClientReady, readyClient => {
     setInterval(() => dashboardMonitor(readyClient), 5000);
     setInterval(() => hierarchyMonitor(readyClient), 180000);
     setInterval(() => updateAcademyPanel(readyClient), 60000);
+    setInterval(() => achievementMonitor(readyClient), 30000);
     console.log('[INFO] Todos os monitores foram ativados.');
     console.log(`\n---\nLogado como ${readyClient.user.tag}\n---`);
 });
