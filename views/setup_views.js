@@ -303,7 +303,7 @@ async function getDecorationsMenuPayload(db) {
 }
 
 // --- NOVA FUNÇÃO DE PAYLOAD ---
-async function getCareerRequirementsMenuPayload(db, guild) {
+async function getCareerRequirementsMenuPayload(db, interaction) { // Alterado para receber a 'interaction'
     const requirements = await db.all('SELECT * FROM rank_requirements');
     const embed = new EmbedBuilder()
         .setColor('Aqua')
@@ -312,29 +312,36 @@ async function getCareerRequirementsMenuPayload(db, guild) {
         .setImage(SETUP_EMBED_IMAGE_URL)
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
 
-    if (requirements.length > 0) {
-        let reqList = '';
+    if (requirements.length === 0) {
+        embed.addFields({ name: 'Progressões Configuradas', value: '`Nenhuma etapa de carreira foi configurada ainda.`' });
+    } else {
+        const fields = [];
         for (const req of requirements) {
-            // --- INÍCIO DA CORREÇÃO ---
-            // Alterado de guild.roles.fetch() para guild.roles.cache.get()
-            // que é mais rápido e fiável para este caso de uso.
-            const prevRole = guild.roles.cache.get(req.previous_role_id);
-            const newRole = guild.roles.cache.get(req.role_id);
-            
+            // Acessa os cargos diretamente do cache da guild na interação
+            const prevRole = interaction.guild.roles.cache.get(req.previous_role_id);
+            const newRole = interaction.guild.roles.cache.get(req.role_id);
+
             const prevRoleName = prevRole ? prevRole.name : 'Cargo Apagado';
             const newRoleName = newRole ? newRole.name : 'Cargo Apagado';
-            // --- FIM DA CORREÇÃO ---
-
-            reqList += `**De:** ${prevRoleName} **Para:** ${newRoleName}\n`;
-            reqList += `> Horas: \`${req.required_patrol_hours}\` | Cursos: \`${req.required_courses}\` | Recrutas: \`${req.required_recruits}\` | Dias no Cargo: \`${req.required_time_in_rank_days}\`\n\n`;
+            
+            const valueString = `> **Horas:** \`${req.required_patrol_hours}\`\n` +
+                              `> **Cursos:** \`${req.required_courses}\`\n` +
+                              `> **Recrutas:** \`${req.required_recruits}\`\n` +
+                              `> **Dias no Cargo:** \`${req.required_time_in_rank_days}\``;
+            
+            fields.push({
+                name: `De \`${prevRoleName}\` Para \`${newRoleName}\``,
+                value: valueString,
+                inline: false
+            });
         }
-        embed.addFields({ name: 'Progressões Configuradas', value: reqList });
-    } else {
-        embed.addFields({ name: 'Progressões Configuradas', value: '`Nenhuma etapa de carreira foi configurada ainda.`' });
+        embed.addFields(fields);
     }
 
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('career_add_step').setLabel('Adicionar Etapa').setStyle(ButtonStyle.Success),
+        // Adicionado novo botão de Editar
+        new ButtonBuilder().setCustomId('career_edit_step').setLabel('Editar Etapa').setStyle(ButtonStyle.Primary).setDisabled(requirements.length === 0),
         new ButtonBuilder().setCustomId('career_remove_step').setLabel('Remover Etapa').setStyle(ButtonStyle.Danger).setDisabled(requirements.length === 0),
         new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
