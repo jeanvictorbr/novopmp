@@ -242,7 +242,8 @@ async function sendLog(interaction, quizState, finalScore, passed) {
             { name: 'Candidato', value: interaction.user.toString(), inline: true },
             { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
             { name: 'Nota Final', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            { name: 'Status', value: passed ? '**APROVADO**' : '**REPROVADO**', inline: false }
+            { name: 'Status', value: passed ? '**APROVADO**' : '**REPROVADO**', inline: false },
+            { name: 'Resumo das Respostas', value: summary } 
         )
         .setTimestamp()
         .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
