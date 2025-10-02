@@ -21,7 +21,6 @@ module.exports = {
             const userId = interaction.user.id;
             const now = Math.floor(Date.now() / 1000);
 
-            // 1. Buscar todas as conquistas e as que o utilizador já desbloqueou
             const allAchievements = await db.all('SELECT * FROM achievements ORDER BY type, requirement ASC');
             const userAchievements = await db.all('SELECT * FROM user_achievements WHERE user_id = $1', [userId]);
             const unlockedMap = new Map(userAchievements.map(ua => [ua.achievement_id, ua]));
@@ -30,17 +29,20 @@ module.exports = {
                 return await interaction.editReply({ content: 'Nenhuma conquista foi configurada pela administração ainda.', embeds: [], components: [] });
             }
 
-            // 2. Buscar o progresso atual do utilizador para cada tipo
+            // --- CORREÇÃO APLICADA AQUI ---
+            const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [userId]);
+
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [userId]);
             const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
             const activeSeconds = activeSession ? now - activeSession.start_time : 0;
-            const totalPatrolHours = Math.floor(((Number(patrolHistory?.total) || 0) + activeSeconds) / 3600);
+            const totalPatrolHours = Math.floor(((Number(patrolHistory?.total) || 0) + activeSeconds) / 3600) + (manualStats?.manual_patrol_hours || 0);
 
             const recruitsData = await db.get("SELECT COUNT(*) AS total FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
-            const totalRecruits = recruitsData?.total || 0;
+            const totalRecruits = (recruitsData?.total || 0) + (manualStats?.manual_recruits || 0);
 
             const coursesData = await db.get('SELECT COUNT(*) AS total FROM user_certifications WHERE user_id = $1', [userId]);
-            const totalCourses = coursesData?.total || 0;
+            const totalCourses = (coursesData?.total || 0) + (manualStats?.manual_courses || 0);
+            // --- FIM DA CORREÇÃO ---
 
             const progressMap = {
                 patrol_hours: totalPatrolHours,
@@ -48,7 +50,6 @@ module.exports = {
                 courses: totalCourses,
             };
 
-            // 3. Construir a Embed
             const embed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle(`🏅 Painel de Conquistas - ${interaction.user.username}`)
@@ -62,14 +63,12 @@ module.exports = {
                 'courses': { name: 'Cursos Concluídos', icon: '🎓' }
             };
 
-            // Agrupa as conquistas por tipo
             const achievementsByType = allAchievements.reduce((acc, ach) => {
                 if (!acc[ach.type]) acc[ach.type] = [];
                 acc[ach.type].push(ach);
                 return acc;
             }, {});
 
-            // Adiciona um campo para cada tipo de conquista
             for (const type in achievementsByType) {
                 const typeInfo = achievementTypes[type] || { name: type, icon: '⭐' };
                 let description = '';
