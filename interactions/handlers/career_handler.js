@@ -153,7 +153,7 @@ const careerHandler = {
     },
 
     // --- Função Única para Salvar (Adicionar ou Editar) ---
-    async handleRequirementsModal(interaction, mode) {
+ async handleRequirementsModal(interaction, mode) {
         await interaction.deferReply({ ephemeral: true });
         const parts = interaction.customId.split('_');
         
@@ -177,10 +177,8 @@ const careerHandler = {
             );
         }
 
-        // Responde e depois atualiza o painel de gestão para refletir a mudança
-        await interaction.editReply({ content: '✅ Requisitos de promoção salvos com sucesso!' });
-        const payload = await getCareerRequirementsMenuPayload(db, interaction);
-        await interaction.message.edit(payload);
+        // A linha que causava o erro foi removida. Agora só respondemos à interação do modal.
+        await interaction.editReply({ content: '✅ Requisitos de promoção salvos com sucesso! Volte ao menu anterior para ver o painel atualizado.' });
     }
 };
 

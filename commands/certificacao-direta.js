@@ -27,7 +27,8 @@ module.exports = {
 
         modal.addComponents(
             new ActionRowBuilder().addComponents(courseIdInput),
-            new ActionRowRowBuilder().addComponents(userIdInput)
+            // --- CORREÇÃO AQUI ---
+            new ActionRowBuilder().addComponents(userIdInput) // Estava "ActionRowRowBuilder"
         );
 
         await interaction.showModal(modal);
