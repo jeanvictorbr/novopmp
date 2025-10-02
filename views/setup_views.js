@@ -532,7 +532,38 @@ async function getQuizManagementPayload(db, quizId) {
     components.push(row2);
     return { embeds: [embed], components };
 }
+async function getAchievementsMenuPayload(db) {
+    const achievements = await db.all('SELECT * FROM achievements ORDER BY type, requirement ASC');
+    const embed = new EmbedBuilder()
+        .setColor('Gold')
+        .setTitle('🏅 Gestão de Conquistas')
+        .setDescription('Crie ou remova as conquistas que os oficiais podem desbloquear automaticamente ao atingir certos marcos na carreira.')
+        .setImage(SETUP_EMBED_IMAGE_URL)
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
 
+    if (achievements.length > 0) {
+        const achievementsByType = achievements.reduce((acc, ach) => {
+            if (!acc[ach.type]) acc[ach.type] = [];
+            acc[ach.type].push(`> **${ach.name}** - Requisito: \`${ach.requirement}\``);
+            return acc;
+        }, {});
+
+        for (const type in achievementsByType) {
+            embed.addFields({ name: `Tipo: ${type}`, value: achievementsByType[type].join('\n') });
+        }
+    } else {
+        embed.addFields({ name: 'Conquistas Configuradas', value: '`Nenhuma conquista foi criada ainda.`' });
+    }
+
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('achievements_add').setLabel('Adicionar Conquista').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('achievements_remove').setLabel('Remover Conquista').setStyle(ButtonStyle.Danger).setDisabled(achievements.length === 0),
+        // --- BOTÃO VOLTAR CORRIGIDO ---
+        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+    );
+
+    return { embeds: [embed], components: [buttons] };
+}
 
 module.exports = {
   getMainMenuPayload,
