@@ -1,23 +1,30 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const db = require('../database/db.js');
 
-// --- FUNÇÕES VISUAIS CORRIGIDAS ---
+// --- NOVAS FUNÇÕES VISUAIS ---
 
 const createProgressBar = (current, required) => {
-    // SE O REQUISITO FOR 0, A BARRA DEVE ESTAR COMPLETA
+    const totalBlocks = 12; // Aumentado o comprimento da barra
+
     if (required <= 0) {
-        return `[██████████] 100%`;
+        return `[${'🟩'.repeat(totalBlocks)}] 100%`;
     }
+
     const percentage = Math.min(100, Math.floor((current / required) * 100));
-    const filledBlocks = Math.round(percentage / 10);
-    const emptyBlocks = 10 - filledBlocks;
-    return `[${'█'.repeat(filledBlocks)}${'─'.repeat(emptyBlocks)}] ${percentage}%`;
+    const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+    const emptyBlocks = totalBlocks - filledBlocks;
+
+    let barColor;
+    if (percentage >= 100) barColor = '🟩';
+    else if (percentage >= 50) barColor = '🟨';
+    else barColor = '🟥';
+    
+    return `[${barColor.repeat(filledBlocks)}${'⬛'.repeat(emptyBlocks)}] ${percentage}%`;
 };
 
 const formatProgress = (current, required) => {
     const emoji = current >= required ? '✅' : '❌';
     const bar = createProgressBar(current, required);
-    // Adiciona a barra de progresso abaixo do contador
     return `${emoji} \`${current} / ${required}\`\n${bar}`;
 };
 
@@ -44,6 +51,7 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        // ... (o resto da função 'execute' permanece exatamente igual à versão anterior)
         await interaction.deferReply({ ephemeral: true });
         const targetUser = interaction.options.getUser('oficial');
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);

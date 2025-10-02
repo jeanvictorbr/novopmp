@@ -4,13 +4,22 @@ const db = require('../database/db.js');
 // --- FUNÇÕES VISUAIS CORRIGIDAS ---
 
 const createProgressBar = (current, required) => {
+    const totalBlocks = 12; // Aumentado o comprimento da barra
+
     if (required <= 0) {
-        return `[██████████] 100%`;
+        return `[${'🟩'.repeat(totalBlocks)}] 100%`;
     }
+
     const percentage = Math.min(100, Math.floor((current / required) * 100));
-    const filledBlocks = Math.round(percentage / 10);
-    const emptyBlocks = 10 - filledBlocks;
-    return `[${'█'.repeat(filledBlocks)}${'─'.repeat(emptyBlocks)}] ${percentage}%`;
+    const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+    const emptyBlocks = totalBlocks - filledBlocks;
+
+    let barColor;
+    if (percentage >= 100) barColor = '🟩';
+    else if (percentage >= 50) barColor = '🟨';
+    else barColor = '🟥';
+    
+    return `[${barColor.repeat(filledBlocks)}${'⬛'.repeat(emptyBlocks)}] ${percentage}%`;
 };
 
 const formatProgress = (current, required) => {
@@ -37,6 +46,7 @@ module.exports = {
         .setDescription('Verifica o seu progresso pessoal para a próxima promoção.'),
 
     async execute(interaction) {
+        // ... (o resto da função 'execute' permanece exatamente igual à versão anterior)
         await interaction.deferReply({ ephemeral: true });
 
         const targetUser = interaction.user;
