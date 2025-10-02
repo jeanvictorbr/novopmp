@@ -5,13 +5,12 @@ const { getEnlistmentMenuPayload, getQuizHubPayload, getQuizManagementPayload, S
 const userQuizStates = new Map();
 
 //======================================================================
-// FUNÇÕES SEGURAS DE ACESSO AO BANCO DE DADOS
+// FUNÇÕES DE ACESSO AO BANCO DE DADOS
 //======================================================================
 async function getQuestions(quizId) {
     try {
         const quiz = await db.get('SELECT questions FROM enlistment_quizzes WHERE quiz_id = $1', [quizId]);
-        if (!quiz) return null;
-        if (!quiz.questions) return [];
+        if (!quiz || !quiz.questions) return [];
         if (Array.isArray(quiz.questions)) return quiz.questions;
         if (typeof quiz.questions === 'string') {
             try {
@@ -38,7 +37,184 @@ async function saveQuestions(quizId, questions) {
 }
 
 //======================================================================
-// HANDLER PRINCIPAL
+// LÓGICA COMPLETA DO QUIZ (QUE ESTAVA EM FALTA)
+//======================================================================
+
+async function startQuiz(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
+    const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
+    if (!activeQuizId) {
+        return interaction.editReply('❌ Nenhuma prova teórica está ativa no momento. Contacte um administrador.');
+    }
+
+    const quiz = await db.get('SELECT * FROM enlistment_quizzes WHERE quiz_id = $1', [activeQuizId]);
+    const questions = await getQuestions(activeQuizId);
+
+    if (!quiz || !questions || questions.length === 0) {
+        return interaction.editReply('❌ A prova teórica ativa não contém perguntas. Contacte um administrador.');
+    }
+
+    try {
+        const tempChannel = await interaction.guild.channels.create({
+            name: `prova-${interaction.user.username.substring(0, 20)}`,
+            type: ChannelType.GuildText,
+            parent: interaction.channel.parent, // Cria na mesma categoria do canal atual
+            permissionOverwrites: [
+                { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
+            ],
+            topic: `Canal temporário para a prova de ${interaction.user.tag}.`
+        });
+
+        const quizState = {
+            quiz,
+            questions,
+            answers: [],
+            currentQuestion: 0,
+            startTime: Date.now(),
+            channelId: tempChannel.id,
+        };
+        userQuizStates.set(interaction.user.id, quizState);
+
+        await interaction.editReply(`✅ A sua prova foi iniciada no canal privado: ${tempChannel}`);
+        await tempChannel.send({ content: `Olá, ${interaction.user}! Bem-vindo(a) à sua prova teórica. Responda às perguntas clicando nos botões. Este canal será apagado automaticamente no final.` });
+        await sendQuestion(interaction, tempChannel, quizState);
+    } catch (error) {
+        console.error("Erro ao criar canal da prova:", error);
+        await interaction.editReply('❌ Ocorreu um erro ao criar o seu canal de prova. Verifique se tenho permissões para criar canais nesta categoria.');
+    }
+}
+
+async function sendQuestion(interaction, channel, quizState, edit = false) {
+    const questionData = quizState.questions[quizState.currentQuestion];
+    const questionNumber = quizState.currentQuestion + 1;
+    const totalQuestions = quizState.questions.length;
+
+    const embed = new EmbedBuilder()
+        .setColor('Blue')
+        .setTitle(`${quizState.quiz.title} - Pergunta ${questionNumber} de ${totalQuestions}`)
+        .setDescription(`**${questionData.question}**`);
+
+    const buttons = new ActionRowBuilder();
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; // Suporta mais opções
+    questionData.options.forEach((option, index) => {
+        if (index < letters.length) {
+            embed.addFields({ name: `${letters[index]})`, value: option });
+            buttons.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`quiz_answer_${letters[index]}`)
+                    .setLabel(letters[index])
+                    .setStyle(ButtonStyle.Primary)
+            );
+        }
+    });
+
+    const payload = { embeds: [embed], components: [buttons] };
+    try {
+        if (edit && interaction.message) {
+            await interaction.message.edit(payload);
+        } else {
+            await channel.send(payload);
+        }
+    } catch (error) {
+        console.error("Erro ao enviar/editar pergunta do quiz:", error);
+    }
+}
+
+async function handleQuizAnswer(interaction) {
+    const quizState = userQuizStates.get(interaction.user.id);
+    if (!quizState) {
+        return await interaction.update({ content: 'A sua sessão da prova expirou ou não foi encontrada.', embeds: [], components: [] });
+    }
+
+    await interaction.deferUpdate();
+    const selectedAnswer = interaction.customId.split('_').pop();
+    quizState.answers.push(selectedAnswer);
+    quizState.currentQuestion++;
+
+    if (quizState.currentQuestion < quizState.questions.length) {
+        await sendQuestion(interaction, interaction.channel, quizState, true);
+    } else {
+        await interaction.message.edit({ content: 'Calculando o seu resultado...', embeds: [], components: [] });
+        await endQuiz(interaction, interaction.channel, quizState);
+    }
+}
+
+async function endQuiz(interaction, channel, quizState) {
+    let correctAnswers = 0;
+    quizState.questions.forEach((q, index) => {
+        if (q.correct.toUpperCase() === quizState.answers[index]) {
+            correctAnswers++;
+        }
+    });
+
+    const finalScore = (correctAnswers / quizState.questions.length) * 100;
+    const passed = finalScore >= quizState.quiz.passing_score;
+
+    const resultEmbed = new EmbedBuilder()
+        .setTitle('Resultado da Prova Teórica')
+        .setColor(passed ? 'Green' : 'Red')
+        .addFields(
+            { name: 'Acertos', value: `\`${correctAnswers} de ${quizState.questions.length}\``, inline: true },
+            { name: 'Nota Mínima', value: `\`${quizState.quiz.passing_score}%\``, inline: true },
+            { name: 'Sua Nota', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
+            { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: false }
+        );
+
+    if (passed) {
+        const passedRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_passed_role_id'"))?.value;
+        if (passedRoleId) {
+            try {
+                await interaction.member.roles.add(passedRoleId);
+                resultEmbed.setDescription('Parabéns! Você foi aprovado(a) e recebeu o cargo de acesso para o alistamento. Agora você já pode se alistar no painel correspondente.');
+            } catch (error) {
+                console.error("Erro ao adicionar cargo pós-prova:", error);
+                resultEmbed.setDescription('Parabéns! Você foi aprovado(a). No entanto, ocorreu um erro ao tentar adicionar o seu cargo de acesso. Por favor, contacte um administrador.');
+            }
+        }
+    } else {
+        resultEmbed.setDescription('Infelizmente, você não atingiu a nota mínima. Estude mais um pouco e tente novamente mais tarde.');
+    }
+
+    await channel.send({ embeds: [resultEmbed] });
+    await sendLog(interaction, quizState, finalScore, passed);
+
+    userQuizStates.delete(interaction.user.id);
+    await channel.send('Este canal será apagado em 30 segundos.');
+    setTimeout(() => channel.delete().catch(console.error), 30000);
+}
+
+// ======================================================================
+// A FUNÇÃO QUE TU QUERES EDITAR ESTÁ AQUI
+// ======================================================================
+async function sendLog(interaction, quizState, finalScore, passed) {
+    const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'"))?.value;
+    if (!logChannelId) return;
+
+    const channel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
+    if (!channel) return;
+
+    // --- EDITA ESTA EMBED PARA ALTERAR O LOG DA PROVA ---
+    const embed = new EmbedBuilder()
+        .setTitle(passed ? '✅ Prova Teórica Aprovada' : '❌ Prova Teórica Reprovada')
+        .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
+        .setColor(passed ? 'Green' : 'Red')
+        .addFields(
+            { name: 'Candidato', value: interaction.user.toString(), inline: true },
+            { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
+            { name: 'Nota Final', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
+            { name: 'Status', value: passed ? '**APROVADO**' : '**REPROVADO**', inline: false }
+        )
+        .setTimestamp()
+        .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
+
+    await channel.send({ embeds: [embed] });
+}
+
+//======================================================================
+// HANDLER PRINCIPAL E OUTRAS FUNÇÕES
 //======================================================================
 const enlistmentHandler = {
     customId: (id) => id.startsWith('enlistment_') || id.startsWith('quiz_') || id === 'delete_cancel',
@@ -61,8 +237,11 @@ const enlistmentHandler = {
             if (customId.startsWith('enlistment_setup_')) return this.handleSetup(interaction);
             if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
             if (customId === 'enlistment_start_process') return this.handleStartProcess(interaction);
-            if (customId === 'quiz_public_start') return this.startQuiz(interaction);
-            if (customId.startsWith('quiz_answer_')) return this.handleQuizAnswer(interaction);
+            
+            // CHAMADAS CORRIGIDAS
+            if (customId === 'quiz_public_start') return startQuiz(interaction);
+            if (customId.startsWith('quiz_answer_')) return handleQuizAnswer(interaction);
+            
             if (customId.startsWith('enlistment_approve_') || customId.startsWith('enlistment_reject_')) return this.handleApproval(interaction);
         } catch (error) {
             console.error("Erro geral ao processar interação:", error);
@@ -71,7 +250,9 @@ const enlistmentHandler = {
             else await interaction.reply(replyPayload).catch(() => {});
         }
     },
-
+    
+    // Cola aqui o resto do teu ficheiro original, desde a função handleSetup até ao final
+    // (Omitido para não repetir o que já sei que tens)
     async handleSetup(interaction) {
         const action = interaction.customId.split('_').slice(2).join('_');
         if (action === 'manage_quizzes') {
@@ -96,10 +277,8 @@ const enlistmentHandler = {
             await interaction.update(await getEnlistmentMenuPayload(db));
         }
     },
-
     async handleQuizAdmin(interaction) {
         const { customId } = interaction;
-    
         if (interaction.isStringSelectMenu()) {
             await interaction.deferUpdate();
             if (customId === 'quiz_admin_select_action') {
@@ -125,15 +304,12 @@ const enlistmentHandler = {
             }
             return;
         }
-    
         if (interaction.isButton()) {
             const parts = customId.split('|');
             const mainAction = parts[0];
-    
             if (mainAction === 'quiz_admin') {
                 const [, action, quizId, questionIndexStr] = parts;
                 const questionIndex = parseInt(questionIndexStr, 10);
-
                 if (action === 'open_edit_modal') {
                     const questions = await getQuestions(quizId);
                     const questionData = questions?.[questionIndex];
@@ -157,10 +333,8 @@ const enlistmentHandler = {
                 }
                 return;
             }
-    
             const oldParts = customId.split('_');
             const oldAction = oldParts[2];
-            
             if (oldAction === 'create') {
                 const modal = new ModalBuilder().setCustomId('quiz_admin_create_modal').setTitle('Criar Nova Prova');
                 modal.addComponents(
@@ -209,7 +383,6 @@ const enlistmentHandler = {
             }
         }
     },
-    
     async handleCreateQuizModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const title = interaction.fields.getTextInputValue('quiz_title');
@@ -220,7 +393,6 @@ const enlistmentHandler = {
         await db.run('INSERT INTO enlistment_quizzes (title, passing_score, questions) VALUES ($1, $2, $3)', [title, passingScore, '[]']);
         await interaction.editReply({ content: `✅ Prova "${title}" criada com sucesso! Volte ao menu para vê-la na lista.` });
     },
-
     async handleAddQuestionModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const quizId = interaction.customId.split('_').pop();
@@ -243,7 +415,6 @@ const enlistmentHandler = {
             await interaction.editReply({ content: '❌ Ocorreu um erro crítico ao processar o formulário.' });
         }
     },
-
     async handleEditQuestionModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const [, quizId, questionIndexStr] = interaction.customId.split('|');
@@ -271,7 +442,6 @@ const enlistmentHandler = {
             await interaction.editReply({ content: '❌ Ocorreu um erro crítico ao salvar as alterações.' });
         }
     },
-    
     async handleStartProcess(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const activeQuizId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_id'"))?.value;
@@ -306,7 +476,6 @@ const enlistmentHandler = {
             components: [selectMenu]
         });
     },
-    
     async handleRecruiterSelect(interaction) {
         const recruiterId = interaction.values[0];
         const modal = new ModalBuilder()
@@ -318,7 +487,6 @@ const enlistmentHandler = {
         );
         await interaction.showModal(modal);
     },
-
     async handleEnlistmentModal(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const [, recruiterId] = interaction.customId.split('|');
@@ -357,13 +525,6 @@ const enlistmentHandler = {
         await channel.send({ content: `Atenção, <@&${recruiterRoleId}>!`, embeds: [embed], components: [buttons] });
         await interaction.editReply({ content: '✅ A sua ficha foi enviada para análise!' });
     },
-    
-    async startQuiz(interaction) { /* ...código anterior... */ },
-    async sendQuestion(interaction, channel, quizState, edit = false) { /* ...código anterior... */ },
-    async handleQuizAnswer(interaction) { /* ...código anterior... */ },
-    async endQuiz(interaction, channel, quizState) { /* ...código anterior... */ },
-    async sendLog(interaction, quizState, finalScore, passed) { /* ...código anterior... */ },
-    
     async handleApproval(interaction) {
         await interaction.deferUpdate();
         const [action, requestId] = interaction.customId.replace('enlistment_', '').split('_');
@@ -386,7 +547,7 @@ const enlistmentHandler = {
         if (newStatus === 'approved') {
             if (quizPassedRoleId) await candidate.roles.remove(quizPassedRoleId).catch(console.error);
             if (recruitRoleId) await candidate.roles.add(recruitRoleId).catch(console.error);
-            dmEmbed = new EmbedBuilder().setColor('Green').setTitle('🎉 Alistamento Aprovado!').setDescription('Parabéns! Sua ficha foi aprovada e seu registro foi concluído.');
+            dmEmbed = new EmbedBuilder().setColor('Green').setTitle('🎉 Alistamento Aprovado!').setThumbnail('https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmMxa2EwMjY2cWdyNHgxNXFrZmEydHlqbWk5eWJocTV2bDQ1NnVmZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tf9jjMcO77YzV4YPwE/giphy.gif').setDescription('Parabéns! Sua ficha foi aprovada e seu registro foi concluído.');
             actionHistoryText = `✅ Aprovado por ${interaction.user.toString()}`;
             try {
                 const tagConfig = await db.get('SELECT tag FROM role_tags WHERE role_id = $1', [recruitRoleId]);
@@ -431,16 +592,5 @@ const enlistmentHandler = {
         await interaction.message.edit({ embeds: [decisionEmbed], components: [] });
     }
 };
-
-// ======================================================================
-// RE-ADICIONA AS FUNÇÕES INALTERADAS PARA GARANTIR INTEGRIDADE DO ARQUIVO
-// ======================================================================
-Object.assign(enlistmentHandler, {
-    startQuiz: enlistmentHandler.startQuiz,
-    sendQuestion: enlistmentHandler.sendQuestion,
-    handleQuizAnswer: enlistmentHandler.handleQuizAnswer,
-    endQuiz: enlistmentHandler.endQuiz,
-    sendLog: enlistmentHandler.sendLog,
-});
 
 module.exports = enlistmentHandler;

@@ -25,6 +25,7 @@ async function sendCertificationNotification(interaction, member, course) {
         const roleMention = role ? role.toString() : 'Nenhum cargo associado';
         const dmEmbed = new EmbedBuilder().setColor('Gold').setTitle('🎉 Parabéns! Você foi certificado!').setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
             .setDescription(`Você foi aprovado(a) e certificado(a) diretamente no curso **${course.name}**.`)
+            .setThumbnail('https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmMxa2EwMjY2cWdyNHgxNXFrZmEydHlqbWk5eWJocTV2bDQ1NnVmZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tf9jjMcO77YzV4YPwE/giphy.gif')
             .addFields(
                 { name: 'Cargo Recebido', value: roleMention, inline: true },
                 { name: 'Data da Certificação', value: `<t:${timestamp}:f>`, inline: true }

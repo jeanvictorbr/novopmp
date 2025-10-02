@@ -56,7 +56,7 @@ async function checkAndAwardAchievements(client) {
                 if (currentProgress >= achievement.requirement) {
                     await db.run('INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3)', [member.id, achievement.achievement_id, now]);
                     try {
-                        const embed = new EmbedBuilder().setColor('Gold').setTitle('🏅 Conquista Desbloqueada!').setDescription(`Parabéns, ${member.displayName}! Você desbloqueou a conquista **${achievement.name}**.\n\n*${achievement.description}*`).setThumbnail('https://i.imgur.com/g8s1t1b.png').setTimestamp();
+                        const embed = new EmbedBuilder().setColor('Gold').setTitle('🏅 Conquista Desbloqueada!').setDescription(`Parabéns, ${member.displayName}! Você desbloqueou a conquista **${achievement.name}**.\n\n*${achievement.description}*`).setThumbnail('https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmMxa2EwMjY2cWdyNHgxNXFrZmEydHlqbWk5eWJocTV2bDQ1NnVmZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tf9jjMcO77YzV4YPwE/giphy.gif').setTimestamp();
                         await member.send({ embeds: [embed] });
                     } catch (e) { console.warn(`[ACHIEVEMENTS] Falha ao notificar ${member.user.tag} sobre nova conquista.`); }
                 }
@@ -69,7 +69,7 @@ async function checkAndAwardAchievements(client) {
                 if (currentProgress < unlocked.requirement) {
                     await db.run('DELETE FROM user_achievements WHERE user_id = $1 AND achievement_id = $2', [member.id, unlocked.achievement_id]);
                     try {
-                        const embed = new EmbedBuilder().setColor('Red').setTitle('💔 Conquista Revogada').setDescription(`A sua conquista **${unlocked.name}** foi revogada pois os requisitos não são mais cumpridos.`).setThumbnail('https://i.imgur.com/g8s1t1b.png').setTimestamp();
+                        const embed = new EmbedBuilder().setColor('Red').setTitle('💔 Conquista Revogada').setDescription(`A sua conquista **${unlocked.name}** foi revogada pois os requisitos não são mais cumpridos.`).setThumbnail('https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExY3psaGs4M3R4dXEwajh4eHZvbzVramdtbTJhb2Q5c3l3dDR6MHl0ayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/JT7Td5xRqkvHQvTdEu/giphy.gif').setTimestamp();
                         await member.send({ embeds: [embed] });
                     } catch (e) { console.warn(`[ACHIEVEMENTS] Falha ao notificar ${member.user.tag} sobre conquista revogada.`); }
                 }
