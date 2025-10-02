@@ -8,7 +8,7 @@ async function generateDossieEmbed(targetUser, guild) {
     // --- BUSCAR DADOS MANUAIS PRIMEIRO ---
     const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [userId]);
 
-    // --- DADOS DE PATRULHA (COM INTEGRAÇÃO) ---
+    // --- DADOS DE PATRULHA (COM CORREÇÃO) ---
     const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total_seconds FROM patrol_history WHERE user_id = $1', [userId]);
     const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
     const activeSeconds = activeSession ? now - activeSession.start_time : 0;
@@ -17,11 +17,11 @@ async function generateDossieEmbed(targetUser, guild) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
 
-    // --- DADOS DE RECRUTAMENTO (COM INTEGRAÇÃO) ---
+    // --- DADOS DE RECRUTAMENTO (COM CORREÇÃO) ---
     const recruitmentData = await db.get("SELECT COUNT(*)::int AS count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
     const totalRecruits = (Number(recruitmentData?.count) || 0) + (Number(manualStats?.manual_recruits) || 0);
 
-    // --- DADOS DE CURSOS (COM INTEGRAÇÃO) ---
+    // --- DADOS DE CURSOS (COM CORREÇÃO) ---
     const certificationsData = await db.get('SELECT COUNT(*) AS count FROM user_certifications WHERE user_id = $1', [userId]);
     const totalCourses = (Number(certificationsData?.count) || 0) + (Number(manualStats?.manual_courses) || 0);
 
