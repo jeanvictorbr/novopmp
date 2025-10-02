@@ -21,8 +21,8 @@ module.exports = {
 
             const promotionTimestamp = Math.floor(Date.now() / 1000);
             await db.run(
-                'INSERT INTO rank_history (user_id, role_id, promoted_at, promoted_by) VALUES ($1, $2, $3, $4)',
-                [userId, newRoleId, promotionTimestamp, interaction.user.id]
+                'INSERT INTO rank_history (user_id, role_id, promoted_at) VALUES ($1, $2, $3)',
+                [userId, newRoleId, promotionTimestamp]
             );
             
             const channelId = (await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'"))?.value;
@@ -30,7 +30,6 @@ module.exports = {
                 const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
                 if (channel) {
                     const imageUrl = (await db.get("SELECT value FROM settings WHERE key = 'decorations_promote_image_url'"))?.value;
-
                     const embed = new EmbedBuilder()
                         .setColor(0x2ECC71)
                         .setAuthor({ name: 'DEPARTAMENTO DE RECURSOS HUMANOS', iconURL: interaction.guild.iconURL() })

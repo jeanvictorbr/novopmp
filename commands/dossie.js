@@ -33,11 +33,8 @@ async function generateDossieEmbed(targetUser, guild) {
     `, [userId]);
     let decorationsText = decorations.map(d => `> ${d.emoji || '🏆'} **${d.name}** em <t:${d.awarded_at}:d>\n> Concedida por: <@${d.awarded_by}>`).join('\n\n') || '`Nenhuma condecoração recebida.`';
     
-    const promotions = await db.all('SELECT role_id, promoted_at, promoted_by FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
-    let promotionsText = promotions.map(p => {
-        const promoter = p.promoted_by ? `| Promovido por: <@${p.promoted_by}>` : '';
-        return `> ⬆️ Promovido a <@&${p.role_id}>\n> Em: <t:${p.promoted_at}:F> ${promoter}`;
-    }).join('\n\n') || '`Nenhum histórico de promoção registado.`';
+    const promotions = await db.all('SELECT role_id, promoted_at FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
+    let promotionsText = promotions.map(p => `> ⬆️ Promovido a <@&${p.role_id}>\n> Em: <t:${p.promoted_at}:F>`).join('\n\n') || '`Nenhum histórico de promoção registado.`';
 
     const sanctions = await db.all(`
         SELECT sanction_id, sanction_type, reason, applied_by, applied_at

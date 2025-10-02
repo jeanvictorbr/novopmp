@@ -172,15 +172,14 @@ const schemaSQL = `
         required_recruits INTEGER DEFAULT 0,
         required_time_in_rank_days INTEGER DEFAULT 0
     );
-    CREATE TABLE rank_history (
+
+    CREATE TABLE IF NOT EXISTS rank_history (
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         role_id VARCHAR(255) NOT NULL,
-        promoted_at BIGINT NOT NULL,
-        promoted_by VARCHAR(255)
-);
+        promoted_at BIGINT NOT NULL
+    );
 `;
-
 async function initializeDatabase() {
     try {
         console.log('[DATABASE] Verificando o esquema do banco de dados...');
