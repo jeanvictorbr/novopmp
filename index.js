@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 require('dotenv-flow').config();
 
-// IMPORTAÇÃO DOS MÓDulos PRINCIPAIS
+// IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
 const { initializeDatabase } = require('./database/schema.js');
 const { punishmentMonitor } = require('./utils/corregedoria/punishmentMonitor.js');
 const { patrolMonitor } = require('./utils/patrolMonitor.js');
@@ -12,7 +12,7 @@ const { hierarchyMonitor } = require('./utils/hierarchyMonitor.js');
 const { updateMemberTag } = require('./utils/tagUpdater.js');
 const { handleManualRoleAdd, handleManualRoleRemove } = require('./utils/manualRoleHandler.js');
 const { updateAcademyPanel } = require('./utils/updateAcademyPanel.js');
-const { achievementMonitor } = require('./utils/achievement_monitor.js'); // IMPORTAÇÃO CORRIGIDA
+const { achievementMonitor } = require('./utils/achievement_monitor.js');
 const masterHandler = require('./interactions/handler.js');
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -69,16 +69,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 });
 
+// --- LÓGICA DO EVENTO COMPLETA E CORRIGIDA ---
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
 
     if (!oldRoles.equals(newRoles)) {
+        // Atualiza a tag do apelido
         updateMemberTag(newMember);
+
+        // Verifica se cargos foram adicionados
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         if (addedRoles.size > 0) {
             handleManualRoleAdd(newMember, addedRoles);
         }
+
+        // Verifica se cargos foram removidos
         const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
         if (removedRoles.size > 0) {
             handleManualRoleRemove(newMember, removedRoles);
