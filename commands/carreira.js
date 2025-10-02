@@ -1,10 +1,35 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../database/db.js');
 
+// --- FUNÇÕES VISUAIS CORRIGIDAS ---
+
+const createProgressBar = (current, required) => {
+    if (required <= 0) {
+        return `[██████████] 100%`;
+    }
+    const percentage = Math.min(100, Math.floor((current / required) * 100));
+    const filledBlocks = Math.round(percentage / 10);
+    const emptyBlocks = 10 - filledBlocks;
+    return `[${'█'.repeat(filledBlocks)}${'─'.repeat(emptyBlocks)}] ${percentage}%`;
+};
+
 const formatProgress = (current, required) => {
     const emoji = current >= required ? '✅' : '❌';
-    return `${emoji} \`${current} / ${required}\``;
+    const bar = createProgressBar(current, required);
+    return `${emoji} \`${current} / ${required}\`\n${bar}`;
 };
+
+async function getHighestCareerRole(member) {
+    const allRequirements = await db.all('SELECT role_id, previous_role_id FROM rank_requirements');
+    const careerRoleIds = new Set([...allRequirements.map(r => r.role_id), ...allRequirements.map(r => r.previous_role_id)]);
+    
+    return member.roles.cache
+        .filter(role => careerRoleIds.has(role.id))
+        .sort((a, b) => b.position - a.position)
+        .first();
+}
+
+// --- FIM DAS FUNÇÕES VISUAIS ---
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,17 +43,19 @@ module.exports = {
         const member = interaction.member;
         
         try {
-            const highestRole = member.roles.highest;
-            const nextRankRequirement = await db.get('SELECT * FROM rank_requirements WHERE previous_role_id = $1', [highestRole.id]);
+            const highestCareerRole = await getHighestCareerRole(member);
+            if (!highestCareerRole) {
+                return await interaction.editReply(`O seu cargo atual não faz parte de uma progressão de carreira configurada.`);
+            }
 
+            const nextRankRequirement = await db.get('SELECT * FROM rank_requirements WHERE previous_role_id = $1', [highestCareerRole.id]);
             if (!nextRankRequirement) {
-                return await interaction.editReply(`O seu cargo atual (${highestRole.name}) não possui uma próxima etapa de carreira configurada.`);
+                return await interaction.editReply(`O seu cargo atual (${highestCareerRole.name}) não possui uma próxima etapa de carreira configurada.`);
             }
 
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
             
-            // Lógica para buscar progresso (horas, cursos, recrutas, tempo) - igual à anterior
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
             const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [targetUser.id]);
             const activeSeconds = activeSession ? now - activeSession.start_time : 0;
@@ -38,20 +65,19 @@ module.exports = {
             const currentCourses = coursesData?.total || 0;
             const recruitsData = await db.get("SELECT COUNT(*) AS total FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [targetUser.id]);
             const currentRecruits = recruitsData?.total || 0;
-            const lastPromotion = await db.get('SELECT promoted_at FROM rank_history WHERE user_id = $1 AND role_id = $2 ORDER BY promoted_at DESC LIMIT 1', [targetUser.id, highestRole.id]);
+            const lastPromotion = await db.get('SELECT promoted_at FROM rank_history WHERE user_id = $1 AND role_id = $2 ORDER BY promoted_at DESC LIMIT 1', [targetUser.id, highestCareerRole.id]);
             let currentTimeInRankDays = lastPromotion ? Math.floor((now - lastPromotion.promoted_at) / 86400) : 0;
 
             const embed = new EmbedBuilder()
                 .setColor('Blue')
                 .setTitle(`📈 Sua Progressão de Carreira`)
                 .setThumbnail(targetUser.displayAvatarURL())
-                .setDescription(`**Cargo Atual:** ${highestRole}\n**Próxima Promoção:** ${nextRole.name}`)
+                .setDescription(`**Cargo Atual:** ${highestCareerRole}\n**Próxima Promoção:** ${nextRole.name}`)
                 .addFields(
-                    { name: 'Requisitos para a Promoção', value: 'Abaixo está o seu progresso para atingir a próxima patente.' },
-                    { name: '⏳ Horas de Patrulha', value: formatProgress(currentHours, nextRankRequirement.required_patrol_hours), inline: true },
-                    { name: '🎓 Cursos Concluídos', value: formatProgress(currentCourses, nextRankRequirement.required_courses), inline: true },
-                    { name: '👥 Recrutas Aprovados', value: formatProgress(currentRecruits, nextRankRequirement.required_recruits), inline: true },
-                    { name: '🗓️ Dias no Cargo Atual', value: formatProgress(currentTimeInRankDays, nextRankRequirement.required_time_in_rank_days), inline: true }
+                    { name: '⏳ Horas de Patrulha', value: formatProgress(currentHours, nextRankRequirement.required_patrol_hours), inline: false },
+                    { name: '🎓 Cursos Concluídos', value: formatProgress(currentCourses, nextRankRequirement.required_courses), inline: false },
+                    { name: '👥 Recrutas Aprovados', value: formatProgress(currentRecruits, nextRankRequirement.required_recruits), inline: false },
+                    { name: '🗓️ Dias no Cargo Atual', value: formatProgress(currentTimeInRankDays, nextRankRequirement.required_time_in_rank_days), inline: false }
                 )
                 .setTimestamp()
                 .setFooter({ text: 'Continue o bom trabalho, oficial!' });

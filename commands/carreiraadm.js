@@ -1,23 +1,26 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const db = require('../database/db.js');
 
-// NOVA FUNÇÃO para criar a barra de progresso
+// --- FUNÇÕES VISUAIS CORRIGIDAS ---
+
 const createProgressBar = (current, required) => {
-    if (required === 0) return 'N/A';
+    // SE O REQUISITO FOR 0, A BARRA DEVE ESTAR COMPLETA
+    if (required <= 0) {
+        return `[██████████] 100%`;
+    }
     const percentage = Math.min(100, Math.floor((current / required) * 100));
     const filledBlocks = Math.round(percentage / 10);
     const emptyBlocks = 10 - filledBlocks;
     return `[${'█'.repeat(filledBlocks)}${'─'.repeat(emptyBlocks)}] ${percentage}%`;
 };
 
-// FUNÇÃO ATUALIZADA para formatar o progresso
 const formatProgress = (current, required) => {
     const emoji = current >= required ? '✅' : '❌';
     const bar = createProgressBar(current, required);
+    // Adiciona a barra de progresso abaixo do contador
     return `${emoji} \`${current} / ${required}\`\n${bar}`;
 };
 
-// NOVA FUNÇÃO para encontrar o cargo de carreira mais alto
 async function getHighestCareerRole(member) {
     const allRequirements = await db.all('SELECT role_id, previous_role_id FROM rank_requirements');
     const careerRoleIds = new Set([...allRequirements.map(r => r.role_id), ...allRequirements.map(r => r.previous_role_id)]);
@@ -27,6 +30,8 @@ async function getHighestCareerRole(member) {
         .sort((a, b) => b.position - a.position)
         .first();
 }
+
+// --- FIM DAS FUNÇÕES VISUAIS ---
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -46,7 +51,6 @@ module.exports = {
         if (!member) return await interaction.editReply('❌ Oficial não encontrado no servidor.');
         
         try {
-            // LÓGICA CORRIGIDA para encontrar o cargo
             const highestCareerRole = await getHighestCareerRole(member);
             if (!highestCareerRole) {
                 return await interaction.editReply(`O oficial ${targetUser.username} não possui um cargo que faça parte de uma progressão de carreira configurada.`);
@@ -60,7 +64,6 @@ module.exports = {
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
             
-            // ... (A lógica de busca de dados permanece a mesma)
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
             const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [targetUser.id]);
             const activeSeconds = activeSession ? now - activeSession.start_time : 0;
