@@ -129,9 +129,10 @@ const schemaSQL = `
         role_id VARCHAR(255) PRIMARY KEY,
         tag TEXT NOT NULL
     );
+    -- TABELAS DO MÓDULO DE ALISTAMENTO (VERSÃO FINAL) --
     CREATE TABLE IF NOT EXISTS enlistment_requests (
         request_id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL UNIQUE,
+        user_id VARCHAR(255) NOT NULL, -- A PALAVRA 'UNIQUE' FOI REMOVIDA DAQUI
         rp_name TEXT NOT NULL,
         game_id TEXT,
         recruiter_id VARCHAR(255),
