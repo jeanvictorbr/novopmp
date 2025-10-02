@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const db = require('../database/db.js');
 
+// --- Funções Visuais ---
+
 const createProgressBar = (current, required) => {
     const totalBlocks = 12;
     if (required <= 0) return `[${'🟩'.repeat(totalBlocks)}] 100%`;
@@ -25,6 +27,8 @@ async function getHighestCareerRole(member) {
         .sort((a, b) => b.position - a.position)
         .first();
 }
+
+// --- Fim das Funções Visuais ---
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -57,8 +61,9 @@ module.exports = {
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
             
+            // --- INTEGRAÇÃO COM ADMINSTATS ---
             const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [targetUser.id]);
-
+            
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
             const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [targetUser.id]);
             const activeSeconds = activeSession ? now - activeSession.start_time : 0;
@@ -73,6 +78,7 @@ module.exports = {
 
             const lastPromotion = await db.get('SELECT promoted_at FROM rank_history WHERE user_id = $1 AND role_id = $2 ORDER BY promoted_at DESC LIMIT 1', [targetUser.id, highestCareerRole.id]);
             let currentTimeInRankDays = lastPromotion ? Math.floor((now - lastPromotion.promoted_at) / 86400) : 0;
+            // --- FIM DA INTEGRAÇÃO ---
             
             const embed = new EmbedBuilder()
                 .setColor('Blue')
