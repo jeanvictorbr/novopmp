@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../../database/db.js');
 
-// --- REUTILIZAÇÃO DAS FUNÇÕES DO COMANDO /carreira ---
+// --- Funções Visuais (reutilizadas do comando /carreira) ---
 
 const createProgressBar = (current, required) => {
     const totalBlocks = 12;
@@ -31,12 +31,12 @@ async function getHighestCareerRole(member) {
         .first();
 }
 
-// --- FIM DA REUTILIZAÇÃO ---
+// --- Fim das Funções Visuais ---
 
 module.exports = {
     customId: 'show_career_progress',
     async execute(interaction) {
-        await interaction.deferUpdate(); // Usa deferUpdate para editar a mensagem existente
+        await interaction.deferUpdate();
 
         const targetUser = interaction.user;
         const member = interaction.member;
@@ -81,10 +81,10 @@ module.exports = {
                 .setTimestamp()
                 .setFooter({ text: 'Continue o bom trabalho, oficial!' });
             
-            // Botão para voltar ao dossiê
+            // --- CORREÇÃO APLICADA AQUI ---
             const backButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId('my_status') // Reutiliza o ID do botão do dossiê
+                    .setCustomId('back_to_dossier') // ID alterado para um novo handler
                     .setLabel('Voltar ao Dossiê')
                     .setStyle(ButtonStyle.Secondary)
                     .setEmoji('⬅️')
