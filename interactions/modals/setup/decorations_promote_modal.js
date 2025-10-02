@@ -19,8 +19,6 @@ module.exports = {
         try {
             await officer.roles.add(newRole);
 
-            // --- CORREÇÃO APLICADA AQUI ---
-            // Adiciona um registo ao histórico de carreira do oficial, incluindo quem o promoveu.
             const promotionTimestamp = Math.floor(Date.now() / 1000);
             await db.run(
                 'INSERT INTO rank_history (user_id, role_id, promoted_at, promoted_by) VALUES ($1, $2, $3, $4)',
