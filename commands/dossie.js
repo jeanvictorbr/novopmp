@@ -5,10 +5,8 @@ async function generateDossieEmbed(targetUser, guild) {
     const userId = targetUser.id;
     const now = Math.floor(Date.now() / 1000);
 
-    // --- BUSCAR DADOS MANUAIS PRIMEIRO ---
     const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [userId]);
 
-    // --- DADOS DE PATRULHA (COM INTEGRAÇÃO) ---
     const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total_seconds FROM patrol_history WHERE user_id = $1', [userId]);
     const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
     const activeSeconds = activeSession ? now - activeSession.start_time : 0;
@@ -17,15 +15,12 @@ async function generateDossieEmbed(targetUser, guild) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const formattedTotalTime = `${hours}h ${minutes}m`;
 
-    // --- DADOS DE RECRUTAMENTO (COM INTEGRAÇÃO) ---
     const recruitmentData = await db.get("SELECT COUNT(*)::int AS count FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
     const totalRecruits = (recruitmentData?.count || 0) + (manualStats?.manual_recruits || 0);
 
-    // --- DADOS DE CURSOS (COM INTEGRAÇÃO) ---
     const certificationsData = await db.get('SELECT COUNT(*) AS count FROM user_certifications WHERE user_id = $1', [userId]);
     const totalCourses = (certificationsData?.count || 0) + (manualStats?.manual_courses || 0);
 
-    // --- HISTÓRICO DA ACADEMIA (LISTAGEM) ---
     const certifications = await db.all(`
         SELECT ac.name, uc.completion_date, uc.certified_by
         FROM user_certifications uc
@@ -36,7 +31,6 @@ async function generateDossieEmbed(targetUser, guild) {
     if (manualStats?.manual_courses > 0) {
         coursesText += `\n> ➕ \`${manualStats.manual_courses}\` cursos adicionados manualmente.`;
     }
-
 
     const decorations = await db.all(`
         SELECT m.name, m.emoji, ud.awarded_by, ud.awarded_at
@@ -81,7 +75,7 @@ async function generateDossieEmbed(targetUser, guild) {
             { name: '📜 Histórico Disciplinar', value: sanctionsText }
         )
         .setTimestamp()
-        .setFooter({ text: `PoliceFlow • Dossiê ID: ${userId}` });
+        .setFooter({ text: `Phoenix • Dossiê ID: ${userId}` });
 
     if (activePunishment) {
         embed.addFields({ name: '⚠️ Punição Ativa', value: `**Tipo:** \`${activePunishment.sanction_type}\`\n**Expira:** <t:${activePunishment.expires_at}:R>` });
@@ -95,7 +89,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('dossie')
         .setDescription('Consulta o histórico militar de um oficial.')
-        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addUserOption(option => 
             option.setName('oficial')
                 .setDescription('O oficial que você deseja consultar.')
