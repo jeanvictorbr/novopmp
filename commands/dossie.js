@@ -81,7 +81,7 @@ async function generateDossieEmbed(targetUser, guild) {
             { name: '📜 Histórico Disciplinar', value: sanctionsText }
         )
         .setTimestamp()
-        .setFooter({ text: `Phoenix • Dossiê ID: ${userId}` });
+        .setFooter({ text: `PoliceFloww • Dossiê ID: ${userId}` });
 
     if (activePunishment) {
         embed.addFields({ name: '⚠️ Punição Ativa', value: `**Tipo:** \`${activePunishment.sanction_type}\`\n**Expira:** <t:${activePunishment.expires_at}:R>` });
