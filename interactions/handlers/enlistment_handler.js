@@ -144,33 +144,25 @@ async function handleQuizAnswer(interaction) {
 
 async function endQuiz(interaction, channel, quizState) {
     let correctAnswers = 0;
-    let summary = ''; // String para construir o resumo
-    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-
+    // A lógica para calcular os resultados permanece a mesma
     quizState.questions.forEach((q, index) => {
-        const userAnswer = quizState.answers[index];
-        const isCorrect = q.correct.toUpperCase() === userAnswer;
-        if (isCorrect) {
+        if (q.correct.toUpperCase() === quizState.answers[index]) {
             correctAnswers++;
         }
-        const emoji = isCorrect ? '✅' : '❌';
-        const questionTitle = q.question.length > 25 ? `${q.question.substring(0, 25)}...` : q.question;
-        summary += `${emoji} **Q${index + 1}:** ${questionTitle}\n> Resposta: ${userAnswer} | Correta: ${q.correct}\n`;
     });
 
     const finalScore = (correctAnswers / quizState.questions.length) * 100;
     const passed = finalScore >= quizState.quiz.passing_score;
 
+    // --- CORREÇÃO APLICADA AQUI: EMBED SIMPLIFICADA PARA O UTILIZADOR ---
     const resultEmbed = new EmbedBuilder()
         .setTitle('Resultado da Prova Teórica')
         .setColor(passed ? 'Green' : 'Red')
+        .setThumbnail(passed ? 'https://i.imgur.com/7S7R0Zt.png' : 'https://i.imgur.com/c33a49R.png') // Ícones de Aprovado/Reprovado
         .addFields(
-            { name: 'Acertos', value: `\`${correctAnswers} de ${quizState.questions.length}\``, inline: true },
-            { name: 'Nota Mínima', value: `\`${quizState.quiz.passing_score}%\``, inline: true },
             { name: 'Sua Nota', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: false },
-            // --- CAMPO DO RESUMO ADICIONADO DE VOLTA ---
-            { name: 'Resumo das Respostas', value: summary }
+            { name: 'Nota Mínima', value: `\`${quizState.quiz.passing_score}%\``, inline: true },
+            { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: true }
         );
 
     if (passed) {
@@ -189,11 +181,48 @@ async function endQuiz(interaction, channel, quizState) {
     }
 
     await channel.send({ embeds: [resultEmbed] });
+    // A função de log agora irá receber o resumo para enviar ao admin
     await sendLog(interaction, quizState, finalScore, passed);
 
     userQuizStates.delete(interaction.user.id);
     await channel.send('Este canal será apagado em 30 segundos.');
     setTimeout(() => channel.delete().catch(console.error), 30000);
+}
+
+
+// --- CORREÇÃO APLICADA AQUI: EMBED DE LOG DETALHADA PARA O ADMIN ---
+async function sendLog(interaction, quizState, finalScore, passed) {
+    const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'"))?.value;
+    if (!logChannelId) return;
+
+    const channel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
+    if (!channel) return;
+
+    // Constrói o resumo das respostas aqui
+    let summary = '';
+    quizState.questions.forEach((q, index) => {
+        const userAnswer = quizState.answers[index];
+        const isCorrect = q.correct.toUpperCase() === userAnswer;
+        const emoji = isCorrect ? '✅' : '❌';
+        const questionTitle = q.question.length > 40 ? `${q.question.substring(0, 40)}...` : q.question;
+        summary += `${emoji} **Q${index + 1}:** ${questionTitle}\n> Resposta: \`${userAnswer}\` | Correta: \`${q.correct}\`\n`;
+    });
+
+    const embed = new EmbedBuilder()
+        .setTitle(passed ? 'Relatório de Prova Teórica - Aprovado' : 'Relatório de Prova Teórica - Reprovado')
+        .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
+        .setColor(passed ? 'Green' : 'Red')
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .addFields(
+            { name: 'Candidato', value: interaction.user.toString(), inline: true },
+            { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
+            { name: 'Pontuação', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
+            { name: 'Resumo das Respostas', value: summary } // O resumo detalhado é adicionado aqui
+        )
+        .setTimestamp()
+        .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
+
+    await channel.send({ embeds: [embed] });
 }
 
 // ======================================================================
