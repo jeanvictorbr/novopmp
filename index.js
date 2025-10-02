@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 const { achievementMonitor } = require('./utils/achievement_monitor.js');
+const { handleManualRoleAdd } = require('./utils/manualRoleHandler.js');
 const path = require('node:path');
 require('dotenv-flow').config();
 
@@ -70,11 +71,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
-    if (!oldMember.roles.cache.equals(newMember.roles.cache)) {
+    const oldRoles = oldMember.roles.cache;
+    const newRoles = newMember.roles.cache;
+
+    // Se os cargos mudaram
+    if (!oldRoles.equals(newRoles)) {
+        // Atualiza a tag do apelido
         updateMemberTag(newMember);
+
+        // --- NOVA INTEGRAÇÃO ---
+        // Verifica se um cargo de curso/medalha foi adicionado manualmente
+        const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
+        if (addedRoles.size > 0) {
+            handleManualRoleAdd(newMember);
+        }
     }
 });
-
 client.once(Events.ClientReady, readyClient => {
     setInterval(() => punishmentMonitor(readyClient), 20000);
     setInterval(() => patrolMonitor(readyClient), 30000);

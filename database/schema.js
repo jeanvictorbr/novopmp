@@ -196,6 +196,13 @@ const schemaSQL = `
         unlocked_at BIGINT NOT NULL,
         PRIMARY KEY (user_id, achievement_id)
     );
+        -- NOVA TABELA PARA ESTATÍSTICAS MANUAIS DE ADMIN --
+    CREATE TABLE IF NOT EXISTS manual_stats (
+        user_id VARCHAR(255) PRIMARY KEY,
+        manual_patrol_hours INTEGER DEFAULT 0,
+        manual_recruits INTEGER DEFAULT 0,
+        manual_courses INTEGER DEFAULT 0
+    );
 `;
 async function initializeDatabase() {
     try {
