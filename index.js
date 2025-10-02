@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
+const { achievementMonitor } = require('./utils/achievement_monitor.js');
 const path = require('node:path');
 require('dotenv-flow').config();
 

@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { generateDossieEmbed } = require('../../commands/dossie.js'); // Importa a função central
+const { generateDossieEmbed } = require('../../commands/dossie.js');
 
 module.exports = {
     customId: 'my_status',
@@ -7,20 +7,22 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            // Gera a embed do dossiê como antes
             const dossieEmbed = await generateDossieEmbed(interaction.user, interaction.guild);
 
-            // --- NOVA INTEGRAÇÃO ---
-            // Cria a nova linha de botões com a funcionalidade de ver o progresso
             const actionRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId('show_career_progress') // ID para o novo handler
-                    .setLabel('Ver Status de Upamento')
+                    .setCustomId('show_career_progress')
+                    .setLabel('Status de Upamento')
                     .setStyle(ButtonStyle.Primary)
-                    .setEmoji('📈')
+                    .setEmoji('📈'),
+                // --- NOVO BOTÃO ADICIONADO ---
+                new ButtonBuilder()
+                    .setCustomId('show_achievements_dashboard')
+                    .setLabel('Ver Conquistas')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🏅')
             );
 
-            // Envia a embed do dossiê com o novo botão
             await interaction.editReply({ embeds: [dossieEmbed], components: [actionRow] });
 
         } catch (error) {

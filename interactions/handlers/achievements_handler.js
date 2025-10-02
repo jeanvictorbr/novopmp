@@ -1,4 +1,4 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js'); // CORRIGIDO AQUI
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const db = require('../../database/db.js');
 
 // Centraliza as definições dos tipos de conquista para fácil reutilização
@@ -83,10 +83,10 @@ const achievementHandler = {
                 [id, name, description, type, requirement]
             );
             
-            // Atualiza a mensagem original do painel para refletir a nova adição
-            const payload = await require('../../views/setup_views.js').getAchievementsMenuPayload(db, interaction);
-            await interaction.message.edit(payload);
-            await interaction.editReply({content: '✅ Conquista criada com sucesso!', components: []});
+            // --- CORREÇÃO APLICADA AQUI ---
+            // A linha que tentava editar a mensagem anterior foi removida.
+            // Agora, apenas confirmamos a ação para o modal, evitando o erro.
+            await interaction.editReply({content: '✅ Conquista criada com sucesso! O painel será atualizado quando voltares.'});
 
         } catch (error) {
             if (error.code === '23505') {
@@ -118,13 +118,11 @@ const achievementHandler = {
     },
     
     async handleRemoveSelect(interaction) {
-        await interaction.deferUpdate();
+        await interaction.deferReply({ ephemeral: true });
         const achievementIdToRemove = interaction.values[0];
         await db.run('DELETE FROM achievements WHERE achievement_id = $1', [achievementIdToRemove]);
         
-        // Atualiza o painel para refletir a remoção
-        const payload = await require('../../views/setup_views.js').getAchievementsMenuPayload(db, interaction);
-        await interaction.editReply(payload);
+        await interaction.editReply({ content: '✅ Conquista removida com sucesso! O painel será atualizado quando voltares.', components: [] });
     }
 };
 
