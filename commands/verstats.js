@@ -10,7 +10,6 @@ module.exports = {
 
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
-
         const targetUser = interaction.options.getUser('oficial');
 
         try {
@@ -18,24 +17,32 @@ module.exports = {
             const realCourses = await db.get('SELECT COUNT(*) AS total FROM user_certifications WHERE user_id = $1', [targetUser.id]);
             const realRecruits = await db.get("SELECT COUNT(*) AS total FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [targetUser.id]);
 
+            // --- CORREÇÃO APLICADA AQUI: Conversão para Número ---
+            const realCoursesCount = Number(realCourses?.total || 0);
+            const manualCoursesCount = Number(manualStats?.manual_courses || 0);
+            const totalCourses = realCoursesCount + manualCoursesCount;
+
+            const realRecruitsCount = Number(realRecruits?.total || 0);
+            const manualRecruitsCount = Number(manualStats?.manual_recruits || 0);
+            const totalRecruits = realRecruitsCount + manualRecruitsCount;
+
             const embed = new EmbedBuilder()
                 .setTitle(`🔍 Análise de Estatísticas: ${targetUser.username}`)
                 .setColor('Yellow')
                 .setDescription('Estes são os valores brutos guardados na base de dados.')
                 .addFields(
                     { name: '--- Cursos Concluídos ---', value: ' ' },
-                    { name: 'Cursos Reais (na tabela de certificações)', value: `\`${realCourses?.total || 0}\``, inline: true },
-                    { name: 'Cursos Manuais (adicionados com /adminstats)', value: `\`${manualStats?.manual_courses || 0}\``, inline: true },
-                    { name: 'Soma Total', value: `\`${(realCourses?.total || 0) + (manualStats?.manual_courses || 0)}\``, inline: true },
+                    { name: 'Cursos Reais (na tabela de certificações)', value: `\`${realCoursesCount}\``, inline: true },
+                    { name: 'Cursos Manuais (adicionados com /adminstats)', value: `\`${manualCoursesCount}\``, inline: true },
+                    { name: 'Soma Total', value: `\`${totalCourses}\``, inline: true },
 
                     { name: '--- Recrutas Aprovados ---', value: ' ' },
-                    { name: 'Recrutas Reais (na tabela de alistamento)', value: `\`${realRecruits?.total || 0}\``, inline: true },
-                    { name: 'Recrutas Manuais (adicionados com /adminstats)', value: `\`${manualStats?.manual_recruits || 0}\``, inline: true },
-                    { name: 'Soma Total', value: `\`${(realRecruits?.total || 0) + (manualStats?.manual_recruits || 0)}\``, inline: true }
+                    { name: 'Recrutas Reais (na tabela de alistamento)', value: `\`${realRecruitsCount}\``, inline: true },
+                    { name: 'Recrutas Manuais (adicionados com /adminstats)', value: `\`${manualRecruitsCount}\``, inline: true },
+                    { name: 'Soma Total', value: `\`${totalRecruits}\``, inline: true }
                 );
 
             await interaction.editReply({ embeds: [embed] });
-
         } catch (error) {
             console.error('Erro ao executar /verstats:', error);
             await interaction.editReply('❌ Ocorreu um erro ao buscar os dados de debug.');
