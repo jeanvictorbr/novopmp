@@ -129,27 +129,23 @@ const schemaSQL = `
         role_id VARCHAR(255) PRIMARY KEY,
         tag TEXT NOT NULL
     );
-
-    -- TABELAS DO MÓDULO DE ALISTAMENTO (VERSÃO FINAL) --
     CREATE TABLE IF NOT EXISTS enlistment_requests (
         request_id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL UNIQUE,
         rp_name TEXT NOT NULL,
         game_id TEXT,
-        recruiter_id VARCHAR(255),      -- Quem indicou/recrutou
-        approver_id VARCHAR(255),       -- Quem clicou em aprovar/reprovar
-        status TEXT DEFAULT 'pending',  -- pending, approved, rejected
+        recruiter_id VARCHAR(255),
+        approver_id VARCHAR(255),
+        status TEXT DEFAULT 'pending',
         request_date BIGINT,
         log_message_id VARCHAR(255)
     );
-
     CREATE TABLE IF NOT EXISTS enlistment_quizzes (
         quiz_id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
         questions JSONB NOT NULL,
         passing_score INTEGER DEFAULT 70
     );
-
     CREATE TABLE IF NOT EXISTS enlistment_attempts (
         attempt_id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
@@ -158,7 +154,6 @@ const schemaSQL = `
         passed BOOLEAN NOT NULL,
         attempt_date BIGINT
     );
-        -- NOVA TABELA PARA AULAS AGENDADAS --
     CREATE TABLE IF NOT EXISTS academy_events (
         event_id SERIAL PRIMARY KEY,
         course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
@@ -167,20 +162,8 @@ const schemaSQL = `
         scheduled_at BIGINT NOT NULL,
         event_time BIGINT NOT NULL,
         title TEXT,
-        status TEXT DEFAULT 'scheduled' -- scheduled, completed, cancelled
+        status TEXT DEFAULT 'scheduled'
     );
-        CREATE TABLE IF NOT EXISTS academy_events (
-        event_id SERIAL PRIMARY KEY,
-        course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
-        guild_id VARCHAR(255) NOT NULL,
-        scheduled_by VARCHAR(255) NOT NULL,
-        scheduled_at BIGINT NOT NULL,
-        event_time BIGINT NOT NULL,
-        title TEXT,
-        status TEXT DEFAULT 'scheduled' -- scheduled, completed, cancelled
-    );
-
-    -- NOVAS TABELAS PARA O MÓDULO DE CARREIRA V2 --
     CREATE TABLE IF NOT EXISTS rank_requirements (
         role_id VARCHAR(255) PRIMARY KEY,
         previous_role_id VARCHAR(255) NOT NULL,
@@ -189,17 +172,15 @@ const schemaSQL = `
         required_recruits INTEGER DEFAULT 0,
         required_time_in_rank_days INTEGER DEFAULT 0
     );
-
     CREATE TABLE IF NOT EXISTS rank_history (
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         role_id VARCHAR(255) NOT NULL,
         promoted_at BIGINT NOT NULL,
-        promoted_by VARCHAR(255) -- NOVA COLUNA ADICIONADA
+        promoted_by VARCHAR(255)
     );
 `;
 
-// Esta função será chamada na inicialização do bot.
 async function initializeDatabase() {
     try {
         console.log('[DATABASE] Verificando o esquema do banco de dados...');
@@ -207,7 +188,7 @@ async function initializeDatabase() {
         console.log('[DATABASE] Esquema verificado e sincronizado com sucesso.');
     } catch (error) {
         console.error('[DATABASE] Erro crítico ao inicializar o banco de dados:', error);
-        process.exit(1); 
+        process.exit(1);
     }
 }
 

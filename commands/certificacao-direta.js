@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, UserSelectMenuBuilder, StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, UserSelectMenuBuilder } = require('discord.js');
 const db = require('../database/db.js');
 
 module.exports = {
