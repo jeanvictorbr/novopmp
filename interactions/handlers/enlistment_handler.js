@@ -144,7 +144,6 @@ async function handleQuizAnswer(interaction) {
 
 async function endQuiz(interaction, channel, quizState) {
     let correctAnswers = 0;
-    // A lógica para calcular os resultados permanece a mesma
     quizState.questions.forEach((q, index) => {
         if (q.correct.toUpperCase() === quizState.answers[index]) {
             correctAnswers++;
@@ -154,14 +153,15 @@ async function endQuiz(interaction, channel, quizState) {
     const finalScore = (correctAnswers / quizState.questions.length) * 100;
     const passed = finalScore >= quizState.quiz.passing_score;
 
-    // --- CORREÇÃO APLICADA AQUI: EMBED SIMPLIFICADA PARA O UTILIZADOR ---
+    // --- EMBED PARA O UTILIZADOR (AGORA COM CONTAGEM DE ACERTOS) ---
     const resultEmbed = new EmbedBuilder()
         .setTitle('Resultado da Prova Teórica')
         .setColor(passed ? 'Green' : 'Red')
-        .setThumbnail(passed ? 'https://i.imgur.com/7S7R0Zt.png' : 'https://i.imgur.com/c33a49R.png') // Ícones de Aprovado/Reprovado
+        .setThumbnail(passed ? 'https://i.imgur.com/7S7R0Zt.png' : 'https://i.imgur.com/c33a49R.png')
         .addFields(
+            // --- CAMPO DE ACERTOS ADICIONADO AQUI ---
+            { name: 'Acertos', value: `\`${correctAnswers} de ${quizState.questions.length}\``, inline: true },
             { name: 'Sua Nota', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            { name: 'Nota Mínima', value: `\`${quizState.quiz.passing_score}%\``, inline: true },
             { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: true }
         );
 
@@ -170,10 +170,10 @@ async function endQuiz(interaction, channel, quizState) {
         if (passedRoleId) {
             try {
                 await interaction.member.roles.add(passedRoleId);
-                resultEmbed.setDescription('Parabéns! Você foi aprovado(a) e recebeu o cargo de acesso para o alistamento. Agora você já pode se alistar no painel correspondente.');
+                resultEmbed.setDescription('Parabéns! Você foi aprovado(a) e recebeu o cargo de acesso para o alistamento.');
             } catch (error) {
                 console.error("Erro ao adicionar cargo pós-prova:", error);
-                resultEmbed.setDescription('Parabéns! Você foi aprovado(a). No entanto, ocorreu um erro ao tentar adicionar o seu cargo de acesso. Por favor, contacte um administrador.');
+                resultEmbed.setDescription('Parabéns! Você foi aprovado(a), mas ocorreu um erro ao adicionar o seu cargo. Contacte um administrador.');
             }
         }
     } else {
@@ -181,7 +181,6 @@ async function endQuiz(interaction, channel, quizState) {
     }
 
     await channel.send({ embeds: [resultEmbed] });
-    // A função de log agora irá receber o resumo para enviar ao admin
     await sendLog(interaction, quizState, finalScore, passed);
 
     userQuizStates.delete(interaction.user.id);
@@ -189,8 +188,6 @@ async function endQuiz(interaction, channel, quizState) {
     setTimeout(() => channel.delete().catch(console.error), 30000);
 }
 
-
-// --- CORREÇÃO APLICADA AQUI: EMBED DE LOG DETALHADA PARA O ADMIN ---
 async function sendLog(interaction, quizState, finalScore, passed) {
     const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'"))?.value;
     if (!logChannelId) return;
@@ -198,7 +195,7 @@ async function sendLog(interaction, quizState, finalScore, passed) {
     const channel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
     if (!channel) return;
 
-    // Constrói o resumo das respostas aqui
+    // --- RESUMO DAS RESPOSTAS CONSTRUÍDO AQUI PARA O LOG DO ADMIN ---
     let summary = '';
     quizState.questions.forEach((q, index) => {
         const userAnswer = quizState.answers[index];
@@ -217,14 +214,14 @@ async function sendLog(interaction, quizState, finalScore, passed) {
             { name: 'Candidato', value: interaction.user.toString(), inline: true },
             { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
             { name: 'Pontuação', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            { name: 'Resumo das Respostas', value: summary } // O resumo detalhado é adicionado aqui
+            // O resumo detalhado é adicionado aqui
+            { name: 'Resumo das Respostas', value: summary } 
         )
         .setTimestamp()
         .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
 
     await channel.send({ embeds: [embed] });
 }
-
 // ======================================================================
 // A FUNÇÃO QUE TU QUERES EDITAR ESTÁ AQUI
 // ======================================================================
