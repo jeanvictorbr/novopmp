@@ -169,6 +169,33 @@ const schemaSQL = `
         title TEXT,
         status TEXT DEFAULT 'scheduled' -- scheduled, completed, cancelled
     );
+        CREATE TABLE IF NOT EXISTS academy_events (
+        event_id SERIAL PRIMARY KEY,
+        course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
+        guild_id VARCHAR(255) NOT NULL,
+        scheduled_by VARCHAR(255) NOT NULL,
+        scheduled_at BIGINT NOT NULL,
+        event_time BIGINT NOT NULL,
+        title TEXT,
+        status TEXT DEFAULT 'scheduled' -- scheduled, completed, cancelled
+    );
+
+    -- NOVAS TABELAS PARA O MÓDULO DE CARREIRA V2 --
+    CREATE TABLE IF NOT EXISTS rank_requirements (
+        role_id VARCHAR(255) PRIMARY KEY,
+        previous_role_id VARCHAR(255) NOT NULL,
+        required_patrol_hours INTEGER DEFAULT 0,
+        required_courses INTEGER DEFAULT 0,
+        required_recruits INTEGER DEFAULT 0,
+        required_time_in_rank_days INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS rank_history (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        role_id VARCHAR(255) NOT NULL,
+        promoted_at BIGINT NOT NULL
+    );
 `;
 
 // Esta função será chamada na inicialização do bot.

@@ -288,12 +288,50 @@ async function getDecorationsMenuPayload(db) {
     new ButtonBuilder().setCustomId('decorations_award_medal').setLabel('Condecorar Oficial').setStyle(ButtonStyle.Primary).setEmoji('🎖️'),
     new ButtonBuilder().setCustomId('decorations_manage_medals').setLabel('Gerenciar Medalhas').setStyle(ButtonStyle.Secondary).setEmoji('📜')
   );
+
+  // --- NOVA LINHA DE BOTÕES ---
   const row2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('career_manage_requirements').setLabel('Gerir Requisitos de Promoção').setStyle(ButtonStyle.Primary).setEmoji('📈')
+  );
+  
+  const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('decorations_set_channel').setLabel('Definir Canal de Anúncios').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('decorations_set_promote_image').setLabel('Definir Imagem de Promoção').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
   );
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row1, row2, row3] };
+}
+
+// --- NOVA FUNÇÃO DE PAYLOAD ---
+async function getCareerRequirementsMenuPayload(db, guild) {
+    const requirements = await db.all('SELECT * FROM rank_requirements');
+    const embed = new EmbedBuilder()
+        .setColor('Aqua')
+        .setTitle('📈 Gestão de Requisitos de Promoção')
+        .setDescription('Configure as etapas e os requisitos necessários para a progressão de carreira dos oficiais.')
+        .setImage(SETUP_EMBED_IMAGE_URL)
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+
+    if (requirements.length > 0) {
+        let reqList = '';
+        for (const req of requirements) {
+            const prevRole = await guild.roles.fetch(req.previous_role_id).catch(() => ({ name: 'Cargo Apagado' }));
+            const newRole = await guild.roles.fetch(req.role_id).catch(() => ({ name: 'Cargo Apagado' }));
+            reqList += `**De:** ${prevRole.name} **Para:** ${newRole.name}\n`;
+            reqList += `> Horas: \`${req.required_patrol_hours}\` | Cursos: \`${req.required_courses}\` | Recrutas: \`${req.required_recruits}\` | Dias no Cargo: \`${req.required_time_in_rank_days}\`\n\n`;
+        }
+        embed.addFields({ name: 'Progressões Configuradas', value: reqList });
+    } else {
+        embed.addFields({ name: 'Progressões Configuradas', value: '`Nenhuma etapa de carreira foi configurada ainda.`' });
+    }
+
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('career_add_step').setLabel('Adicionar Etapa').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('career_remove_step').setLabel('Remover Etapa').setStyle(ButtonStyle.Danger).setDisabled(requirements.length === 0),
+        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+    );
+
+    return { embeds: [embed], components: [buttons] };
 }
 
 async function getDecorationsManageMedalsPayload(db) {
@@ -478,6 +516,7 @@ module.exports = {
   getEnlistmentMenuPayload,
   getQuizHubPayload,
   getQuizManagementPayload,
+  getCareerRequirementsMenuPayload,
   SETUP_EMBED_IMAGE_URL,
   SETUP_FOOTER_TEXT,
   SETUP_FOOTER_ICON_URL,
