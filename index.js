@@ -1,7 +1,5 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
-const { achievementMonitor } = require('./utils/achievement_monitor.js');
-const { handleManualRoleAdd } = require('./utils/manualRoleHandler.js');
 const path = require('node:path');
 require('dotenv-flow').config();
 
@@ -12,8 +10,10 @@ const { patrolMonitor } = require('./utils/patrolMonitor.js');
 const { dashboardMonitor } = require('./utils/dashboardMonitor.js');
 const { hierarchyMonitor } = require('./utils/hierarchyMonitor.js');
 const { updateMemberTag } = require('./utils/tagUpdater.js');
+// --- IMPORTAÇÃO ATUALIZADA ---
+const { handleManualRoleAdd, handleManualRoleRemove } = require('./utils/manualRoleHandler.js');
 const { updateAcademyPanel } = require('./utils/updateAcademyPanel.js');
-const masterHandler = require('./interactions/handler.js'); // Importa o novo Master Handler
+const masterHandler = require('./interactions/handler.js');
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -32,7 +32,7 @@ client.commands = new Collection();
 async function startBot() {
     await initializeDatabase();
     loadCommands(path.join(__dirname, 'commands'));
-    masterHandler.loadHandlers(path.join(__dirname, 'interactions')); // O Master Handler carrega suas próprias interações
+    masterHandler.loadHandlers(path.join(__dirname, 'interactions'));
     await registerSlashCommands();
     client.login(DISCORD_TOKEN);
 }
@@ -56,7 +56,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             if (!command) return;
             await command.execute(interaction);
         } else {
-            // Se não for um comando, entrega para o Master Handler resolver.
             await masterHandler.execute(interaction);
         }
     } catch (error) {
@@ -70,23 +69,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 });
 
+// --- LÓGICA DO EVENTO ATUALIZADA ---
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
 
-    // Se os cargos mudaram
     if (!oldRoles.equals(newRoles)) {
         // Atualiza a tag do apelido
         updateMemberTag(newMember);
 
-        // --- NOVA INTEGRAÇÃO ---
-        // Verifica se um cargo de curso/medalha foi adicionado manualmente
+        // Verifica se cargos foram adicionados
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         if (addedRoles.size > 0) {
-            handleManualRoleAdd(newMember);
+            handleManualRoleAdd(newMember, addedRoles);
+        }
+
+        // Verifica se cargos foram removidos
+        const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+        if (removedRoles.size > 0) {
+            handleManualRoleRemove(newMember, removedRoles);
         }
     }
 });
+
 client.once(Events.ClientReady, readyClient => {
     setInterval(() => punishmentMonitor(readyClient), 20000);
     setInterval(() => patrolMonitor(readyClient), 30000);
