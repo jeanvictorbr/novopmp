@@ -144,10 +144,18 @@ async function handleQuizAnswer(interaction) {
 
 async function endQuiz(interaction, channel, quizState) {
     let correctAnswers = 0;
+    let summary = ''; // String para construir o resumo
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
     quizState.questions.forEach((q, index) => {
-        if (q.correct.toUpperCase() === quizState.answers[index]) {
+        const userAnswer = quizState.answers[index];
+        const isCorrect = q.correct.toUpperCase() === userAnswer;
+        if (isCorrect) {
             correctAnswers++;
         }
+        const emoji = isCorrect ? '✅' : '❌';
+        const questionTitle = q.question.length > 25 ? `${q.question.substring(0, 25)}...` : q.question;
+        summary += `${emoji} **Q${index + 1}:** ${questionTitle}\n> Resposta: ${userAnswer} | Correta: ${q.correct}\n`;
     });
 
     const finalScore = (correctAnswers / quizState.questions.length) * 100;
@@ -160,7 +168,9 @@ async function endQuiz(interaction, channel, quizState) {
             { name: 'Acertos', value: `\`${correctAnswers} de ${quizState.questions.length}\``, inline: true },
             { name: 'Nota Mínima', value: `\`${quizState.quiz.passing_score}%\``, inline: true },
             { name: 'Sua Nota', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: false }
+            { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: false },
+            // --- CAMPO DO RESUMO ADICIONADO DE VOLTA ---
+            { name: 'Resumo das Respostas', value: summary }
         );
 
     if (passed) {
@@ -201,6 +211,7 @@ async function sendLog(interaction, quizState, finalScore, passed) {
         .setTitle(passed ? '✅ Prova Teórica Aprovada' : '❌ Prova Teórica Reprovada')
         .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
         .setColor(passed ? 'Green' : 'Red')
+        .setThumbnail('https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmMxa2EwMjY2cWdyNHgxNXFrZmEydHlqbWk5eWJocTV2bDQ1NnVmZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tf9jjMcO77YzV4YPwE/giphy.gif')
         .addFields(
             { name: 'Candidato', value: interaction.user.toString(), inline: true },
             { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
@@ -209,6 +220,7 @@ async function sendLog(interaction, quizState, finalScore, passed) {
         )
         .setTimestamp()
         .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
+        
 
     await channel.send({ embeds: [embed] });
 }

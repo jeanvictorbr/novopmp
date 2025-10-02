@@ -2,7 +2,6 @@ const db = require('../database/db.js');
 
 async function handleManualRoleAdd(member) {
     try {
-        // Busca todos os cargos de "carreira", cursos e medalhas de uma só vez
         const careerRoles = await db.all('SELECT role_id, previous_role_id FROM rank_requirements');
         const careerRoleIds = new Set([...careerRoles.map(r => r.role_id), ...careerRoles.map(r => r.previous_role_id)]);
         const courseRoles = await db.all('SELECT course_id, role_id FROM academy_courses');
@@ -11,20 +10,19 @@ async function handleManualRoleAdd(member) {
         for (const role of member.roles.cache.values()) {
             const now = Math.floor(Date.now() / 1000);
             
-            // --- NOVA LÓGICA PARA CARREIRA ---
-            // Verifica se o cargo adicionado faz parte do sistema de carreira
+            // --- LÓGICA DE CARREIRA (CORRIGIDA) ---
             if (careerRoleIds.has(role.id)) {
                 const existingPromo = await db.get('SELECT 1 FROM rank_history WHERE user_id = $1 AND role_id = $2', [member.id, role.id]);
                 if (!existingPromo) {
                     await db.run(
-                        'INSERT INTO rank_history (user_id, role_id, promoted_at, promoted_by) VALUES ($1, $2, $3, $4)',
-                        [member.id, role.id, now, member.client.user.id] // Atribui ao próprio bot como "promotor"
+                        'INSERT INTO rank_history (user_id, role_id, promoted_at) VALUES ($1, $2, $3)',
+                        [member.id, role.id, now] // 'promoted_by' foi removido
                     );
                     console.log(`[ManualRole] Promoção para o cargo "${role.name}" registada para ${member.user.tag}.`);
                 }
             }
             
-            // Verifica se é um cargo de curso
+            // Lógica de Cursos
             const courseMatch = courseRoles.find(c => c.role_id === role.id);
             if (courseMatch) {
                 const existingCert = await db.get('SELECT 1 FROM user_certifications WHERE user_id = $1 AND course_id = $2', [member.id, courseMatch.course_id]);
@@ -34,7 +32,7 @@ async function handleManualRoleAdd(member) {
                 }
             }
             
-            // Verifica se é um cargo de medalha
+            // Lógica de Medalhas
             const medalMatch = medalRoles.find(m => m.role_id === role.id);
             if (medalMatch) {
                 const existingDecoration = await db.get('SELECT 1 FROM user_decorations WHERE user_id = $1 AND medal_id = $2', [member.id, medalMatch.medal_id]);
