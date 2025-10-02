@@ -22,7 +22,7 @@ async function getMainMenuPayload() {
       { label: 'Módulo Academia', description: 'Gerencie cursos, certificações e instrutores.', value: 'module_academy', emoji: '🎓' },
       { label: 'Módulo Corregedoria', description: 'Gerencie denúncias, investigações e sanções internas.', value: 'module_corregedoria', emoji: '⚖️' },
       { label: 'Módulo Alistamento', description: 'Gerencie o painel de alistamento e o canal de aprovações.', value: 'module_enlistment', emoji: '🗂️' },
-      { label: 'Módulo Carreira', description: 'Gerencie promoções, medalhas e a carreira dos oficiais.', value: 'module_decorations', emoji: '🏆' },
+      { label: 'Módulo Carreira', description: 'Gerencie promoções, medalhas, requisitos e conquistas.', value: 'module_decorations', emoji: '🏆' },
       { label: 'Módulo Hierarquia', description: 'Configure uma vitrine de cargos que se atualiza sozinha.', value: 'module_hierarchy', emoji: '📊' },
       { label: 'Módulo Tags Policiais', description: 'Gerencie os nicks e tags automáticas dos cargos.', value: 'module_tags', emoji: '🏷️' },
     ]);
@@ -30,7 +30,6 @@ async function getMainMenuPayload() {
   return { embeds: [embed], components: [row] };
 }
 
-// ... (todas as outras funções como getCopomMenuPayload, getAcademyMenuPayload, etc., permanecem inalteradas)
 async function getCopomMenuPayload(db) {
   const settings = await db.all("SELECT key, value FROM settings WHERE key LIKE 'copom_%' OR key = 'em_servico_role_id'");
   const settingsMap = new Map(settings.map(s => [s.key, s.value]));
@@ -91,7 +90,7 @@ async function getCopomTeamsMenuPayload(db) {
 
 async function getAcademyMenuPayload(db) {
     const courses = await db.all('SELECT * FROM academy_courses');
-    // CORREÇÃO: Adicionado 'academy_discussion_channel_id' à query
+    // --- CORREÇÃO APLICADA AQUI ---
     const settings = await db.all("SELECT key, value FROM settings WHERE key IN ('academy_channel_id', 'academy_logs_channel_id', 'academy_discussion_channel_id')");
     const settingsMap = new Map(settings.map(s => [s.key, s.value]));
     
@@ -103,7 +102,7 @@ async function getAcademyMenuPayload(db) {
         .setFields(
             { name: 'Canal de Estudos (Painel Público)', value: settingsMap.has('academy_channel_id') ? `<#${settingsMap.get('academy_channel_id')}>` : '`Não definido`', inline: false },
             { name: 'Canal de Logs da Academia', value: settingsMap.has('academy_logs_channel_id') ? `<#${settingsMap.get('academy_logs_channel_id')}>` : '`Não definido`', inline: false },
-            // CORREÇÃO: Adicionado o campo de status para o canal de discussões
+            // Adicionado o campo de status para o canal de discussões
             { name: 'Canal de Discussões (para Tópicos)', value: settingsMap.has('academy_discussion_channel_id') ? `<#${settingsMap.get('academy_discussion_channel_id')}>` : '`❌ NÃO DEFINIDO - Obrigatório para criar cursos`', inline: false }
         )
         .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
@@ -124,7 +123,7 @@ async function getAcademyMenuPayload(db) {
         new ButtonBuilder().setCustomId('academy_certify_official').setLabel('Gerenciar & Certificar Turmas').setStyle(ButtonStyle.Success).setEmoji('🎖️').setDisabled(courses.length === 0)
     );
     
-    // CORREÇÃO: Botões de configuração reorganizados em duas linhas para acomodar o novo botão
+    // Botões de configuração reorganizados em duas linhas para acomodar o novo botão
     const configButtons1 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('academy_set_channel').setLabel('Definir Canal da Academia').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('academy_set_logs_channel').setLabel('Definir Canal de Logs').setStyle(ButtonStyle.Secondary),
@@ -134,7 +133,6 @@ async function getAcademyMenuPayload(db) {
     const configButtons2 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
-
 
     return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons1, configButtons2] };
 }
@@ -288,7 +286,7 @@ async function getDecorationsMenuPayload(db) {
   const embed = new EmbedBuilder()
     .setColor('Gold')
     .setTitle('🏆 Módulo Carreira e Condecorações')
-    .setDescription('Use os botões abaixo para gerenciar a carreira dos seus oficiais, desde promoções até a concessão de medalhas por mérito.')
+    .setDescription('Use os botões abaixo para gerenciar a carreira dos seus oficiais, desde promoções, medalhas, requisitos e conquistas por mérito.')
     .setImage(SETUP_EMBED_IMAGE_URL)
     .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL })
     .addFields({ name: 'Canal de Anúncios', value: settings ? `<#${settings.value}>` : '`Não definido`' });
@@ -297,65 +295,16 @@ async function getDecorationsMenuPayload(db) {
     new ButtonBuilder().setCustomId('decorations_award_medal').setLabel('Condecorar Oficial').setStyle(ButtonStyle.Primary).setEmoji('🎖️'),
     new ButtonBuilder().setCustomId('decorations_manage_medals').setLabel('Gerenciar Medalhas').setStyle(ButtonStyle.Secondary).setEmoji('📜')
   );
-
-  // --- NOVA LINHA DE BOTÕES ---
   const row2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('career_manage_requirements').setLabel('Gerir Requisitos de Promoção').setStyle(ButtonStyle.Primary).setEmoji('📈')
+      new ButtonBuilder().setCustomId('career_manage_requirements').setLabel('Gerir Requisitos').setStyle(ButtonStyle.Primary).setEmoji('📈'),
+      new ButtonBuilder().setCustomId('career_manage_achievements').setLabel('Gerir Conquistas').setStyle(ButtonStyle.Primary).setEmoji('🏅')
   );
-  
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('decorations_set_channel').setLabel('Definir Canal de Anúncios').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('decorations_set_promote_image').setLabel('Definir Imagem de Promoção').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [embed], components: [row1, row2, row3] };
-}
-
-// --- NOVA FUNÇÃO DE PAYLOAD ---
-async function getCareerRequirementsMenuPayload(db, interaction) { // Alterado para receber a 'interaction'
-    const requirements = await db.all('SELECT * FROM rank_requirements');
-    const embed = new EmbedBuilder()
-        .setColor('Aqua')
-        .setTitle('📈 Gestão de Requisitos de Promoção')
-        .setDescription('Configure as etapas e os requisitos necessários para a progressão de carreira dos oficiais.')
-        .setImage(SETUP_EMBED_IMAGE_URL)
-        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
-
-    if (requirements.length === 0) {
-        embed.addFields({ name: 'Progressões Configuradas', value: '`Nenhuma etapa de carreira foi configurada ainda.`' });
-    } else {
-        const fields = [];
-        for (const req of requirements) {
-            // Acessa os cargos diretamente do cache da guild na interação
-            const prevRole = interaction.guild.roles.cache.get(req.previous_role_id);
-            const newRole = interaction.guild.roles.cache.get(req.role_id);
-
-            const prevRoleName = prevRole ? prevRole.name : 'Cargo Apagado';
-            const newRoleName = newRole ? newRole.name : 'Cargo Apagado';
-            
-            const valueString = `> **Horas:** \`${req.required_patrol_hours}\`\n` +
-                              `> **Cursos:** \`${req.required_courses}\`\n` +
-                              `> **Recrutas:** \`${req.required_recruits}\`\n` +
-                              `> **Dias no Cargo:** \`${req.required_time_in_rank_days}\``;
-            
-            fields.push({
-                name: `De \`${prevRoleName}\` Para \`${newRoleName}\``,
-                value: valueString,
-                inline: false
-            });
-        }
-        embed.addFields(fields);
-    }
-
-    const buttons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('career_add_step').setLabel('Adicionar Etapa').setStyle(ButtonStyle.Success),
-        // Adicionado novo botão de Editar
-        new ButtonBuilder().setCustomId('career_edit_step').setLabel('Editar Etapa').setStyle(ButtonStyle.Primary).setDisabled(requirements.length === 0),
-        new ButtonBuilder().setCustomId('career_remove_step').setLabel('Remover Etapa').setStyle(ButtonStyle.Danger).setDisabled(requirements.length === 0),
-        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
-    );
-
-    return { embeds: [embed], components: [buttons] };
 }
 
 async function getDecorationsManageMedalsPayload(db) {
@@ -458,7 +407,6 @@ async function getEnlistmentMenuPayload(db) {
             { name: 'Canal de Aprovações', value: settingsMap.has('enlistment_approval_channel_id') ? `✅ <#${settingsMap.get('enlistment_approval_channel_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Cargo de Recruta (Final)', value: settingsMap.has('enlistment_recruit_role_id') ? `✅ <@&${settingsMap.get('enlistment_recruit_role_id')}>` : '`❌ Não definido`', inline: true },
             { name: 'Cargo de Recrutador (Staff)', value: settingsMap.has('recruiter_role_id') ? `✅ <@&${settingsMap.get('recruiter_role_id')}>` : '`❌ Não definido`', inline: true },
-            // NOVO CAMPO ADICIONADO AQUI
             { name: 'Canal de Logs das Provas', value: settingsMap.has('enlistment_quiz_logs_channel_id') ? `✅ <#${settingsMap.get('enlistment_quiz_logs_channel_id')}>` : '`❌ Não definido`', inline: false }
         );
     const row1 = new ActionRowBuilder().addComponents(
@@ -469,7 +417,6 @@ async function getEnlistmentMenuPayload(db) {
     const row2 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_passed_role').setLabel('Cargo Pós-Prova').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('enlistment_setup_set_recruit_role').setLabel('Cargo Recruta').setStyle(ButtonStyle.Secondary),
-        // NOVO BOTÃO ADICIONADO AQUI
         new ButtonBuilder().setCustomId('enlistment_setup_set_quiz_logs_channel').setLabel('Logs das Provas').setStyle(ButtonStyle.Secondary)
     );
     const row3 = new ActionRowBuilder().addComponents(
@@ -524,6 +471,51 @@ async function getQuizManagementPayload(db, quizId) {
     components.push(row2);
     return { embeds: [embed], components };
 }
+
+async function getCareerRequirementsMenuPayload(db, interaction) { 
+    const requirements = await db.all('SELECT * FROM rank_requirements');
+    const embed = new EmbedBuilder()
+        .setColor('Aqua')
+        .setTitle('📈 Gestão de Requisitos de Promoção')
+        .setDescription('Configure as etapas e os requisitos necessários para a progressão de carreira dos oficiais.')
+        .setImage(SETUP_EMBED_IMAGE_URL)
+        .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+
+    if (requirements.length > 0) {
+        const fields = [];
+        for (const req of requirements) {
+            const prevRole = interaction.guild.roles.cache.get(req.previous_role_id);
+            const newRole = interaction.guild.roles.cache.get(req.role_id);
+
+            const prevRoleName = prevRole ? prevRole.name : 'Cargo Apagado';
+            const newRoleName = newRole ? newRole.name : 'Cargo Apagado';
+            
+            const valueString = `> **Horas:** \`${req.required_patrol_hours}\`\n` +
+                              `> **Cursos:** \`${req.required_courses}\`\n` +
+                              `> **Recrutas:** \`${req.required_recruits}\`\n` +
+                              `> **Dias no Cargo:** \`${req.required_time_in_rank_days}\``;
+            
+            fields.push({
+                name: `De \`${prevRoleName}\` Para \`${newRoleName}\``,
+                value: valueString,
+                inline: false
+            });
+        }
+        embed.addFields(fields);
+    } else {
+        embed.addFields({ name: 'Progressões Configuradas', value: '`Nenhuma etapa de carreira foi configurada ainda.`' });
+    }
+
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('career_add_step').setLabel('Adicionar Etapa').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('career_edit_step').setLabel('Editar Etapa').setStyle(ButtonStyle.Primary).setDisabled(requirements.length === 0),
+        new ButtonBuilder().setCustomId('career_remove_step').setLabel('Remover Etapa').setStyle(ButtonStyle.Danger).setDisabled(requirements.length === 0),
+        new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+    );
+
+    return { embeds: [embed], components: [buttons] };
+}
+
 async function getAchievementsMenuPayload(db) {
     const achievements = await db.all('SELECT * FROM achievements ORDER BY type, requirement ASC');
     const embed = new EmbedBuilder()
@@ -550,12 +542,12 @@ async function getAchievementsMenuPayload(db) {
     const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('achievements_add').setLabel('Adicionar Conquista').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('achievements_remove').setLabel('Remover Conquista').setStyle(ButtonStyle.Danger).setDisabled(achievements.length === 0),
-        // --- BOTÃO VOLTAR CORRIGIDO ---
         new ButtonBuilder().setCustomId('back_to_decorations_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
 
     return { embeds: [embed], components: [buttons] };
 }
+
 
 module.exports = {
   getMainMenuPayload,
@@ -573,6 +565,7 @@ module.exports = {
   getQuizHubPayload,
   getQuizManagementPayload,
   getCareerRequirementsMenuPayload,
+  getAchievementsMenuPayload,
   SETUP_EMBED_IMAGE_URL,
   SETUP_FOOTER_TEXT,
   SETUP_FOOTER_ICON_URL,
