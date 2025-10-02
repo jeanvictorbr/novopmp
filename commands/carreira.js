@@ -1,14 +1,38 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../database/db.js');
 
-const createProgressBar = (current, required) => { /* ... (código da barra de progresso) ... */ };
-const formatProgress = (current, required) => { /* ... (código de formatação) ... */ };
-async function getHighestCareerRole(member) { /* ... (código para encontrar o cargo) ... */ };
+// --- Funções Visuais ---
+const createProgressBar = (current, required) => {
+    const totalBlocks = 12;
+    if (required <= 0) return `[${'🟩'.repeat(totalBlocks)}] 100%`;
+    const percentage = Math.min(100, Math.floor((current / required) * 100));
+    const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+    const emptyBlocks = totalBlocks - filledBlocks;
+    let barColor = percentage >= 100 ? '🟩' : (percentage >= 50 ? '🟨' : '🟥');
+    return `[${barColor.repeat(filledBlocks)}${'⬛'.repeat(emptyBlocks)}] ${percentage}%`;
+};
 
-// Cole as 3 funções auxiliares da resposta anterior aqui
+const formatProgress = (current, required) => {
+    const emoji = current >= required ? '✅' : '❌';
+    const bar = createProgressBar(current, required);
+    return `${emoji} \`${current} / ${required}\`\n${bar}`;
+};
+
+async function getHighestCareerRole(member) {
+    const allRequirements = await db.all('SELECT role_id, previous_role_id FROM rank_requirements');
+    const careerRoleIds = new Set([...allRequirements.map(r => r.role_id), ...allRequirements.map(r => r.previous_role_id)]);
+    return member.roles.cache
+        .filter(role => careerRoleIds.has(role.id))
+        .sort((a, b) => b.position - a.position)
+        .first();
+}
+// --- Fim das Funções Visuais ---
 
 module.exports = {
-    data: new SlashCommandBuilder().setName('carreira').setDescription('Verifica o seu progresso pessoal para a próxima promoção.'),
+    data: new SlashCommandBuilder()
+        .setName('carreira')
+        .setDescription('Verifica o seu progresso pessoal para a próxima promoção.'),
+
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
         const targetUser = interaction.user;
@@ -16,14 +40,19 @@ module.exports = {
         
         try {
             const highestCareerRole = await getHighestCareerRole(member);
-            if (!highestCareerRole) { /* ... (código de erro) ... */ }
+            if (!highestCareerRole) {
+                return await interaction.editReply(`O seu cargo atual não faz parte de uma progressão de carreira configurada.`);
+            }
+
             const nextRankRequirement = await db.get('SELECT * FROM rank_requirements WHERE previous_role_id = $1', [highestCareerRole.id]);
-            if (!nextRankRequirement) { /* ... (código de erro) ... */ }
+            if (!nextRankRequirement) {
+                return await interaction.editReply(`O seu cargo atual (${highestCareerRole.name}) não possui uma próxima etapa de carreira configurada.`);
+            }
 
             const nextRole = await interaction.guild.roles.fetch(nextRankRequirement.role_id).catch(() => ({ name: 'Cargo Desconhecido' }));
             const now = Math.floor(Date.now() / 1000);
 
-            // --- CORREÇÃO APLICADA AQUI ---
+            // --- INTEGRAÇÃO COM ADMINSTATS ---
             const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [targetUser.id]);
             
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [targetUser.id]);
@@ -40,7 +69,8 @@ module.exports = {
 
             const lastPromotion = await db.get('SELECT promoted_at FROM rank_history WHERE user_id = $1 AND role_id = $2 ORDER BY promoted_at DESC LIMIT 1', [targetUser.id, highestCareerRole.id]);
             let currentTimeInRankDays = lastPromotion ? Math.floor((now - lastPromotion.promoted_at) / 86400) : 0;
-            
+            // --- FIM DA INTEGRAÇÃO ---
+
             const embed = new EmbedBuilder()
                 .setColor('Blue')
                 .setTitle(`📈 Sua Progressão de Carreira`)
@@ -54,7 +84,9 @@ module.exports = {
                 )
                 .setTimestamp()
                 .setFooter({ text: 'Continue o bom trabalho, oficial!' });
+
             await interaction.editReply({ embeds: [embed] });
+
         } catch (error) {
             console.error("Erro ao executar o comando /carreira:", error);
             await interaction.editReply('❌ Ocorreu um erro ao buscar as suas informações de carreira.');
