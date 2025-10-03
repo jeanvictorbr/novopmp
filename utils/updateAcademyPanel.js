@@ -10,23 +10,23 @@ async function updateAcademyPanel(client) {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    const channel = await guild.channels.fetch(panelInfo.channel_id).catch(() => null);
+    const channel = await guild.channels.fetch(panelinfo.channel_id).catch(() => null);
     if (!channel) return;
 
-    const message = await channel.messages.fetch(panelInfo.message_id).catch(() => null);
+    const message = await channel.messages.fetch(panelinfo.message_id).catch(() => null);
     if (!message) return;
 
     const now = Math.floor(Date.now() / 1000);
     
-    // --- LÓGICA ATUALIZADA ---
-    // Busca as próximas 4 aulas com status 'agendada'
+    // --- INÍCIO DA MODIFICAÇÃO ---
+    // A consulta agora busca por aulas com status 'agendada', 'iniciando', ou 'em_progresso'.
     const scheduledEvents = await db.all(
       `SELECT ae.*, ac.name 
        FROM academy_events ae 
        JOIN academy_courses ac ON ae.course_id = ac.course_id 
-       WHERE ae.event_time > $1 AND ae.status = 'agendada' 
+       WHERE ae.status IN ('agendada', 'iniciando', 'em_progresso')
        ORDER BY ae.event_time ASC LIMIT 4`,
-      [now]
+      []
     );
 
     const embed = new EmbedBuilder()
@@ -43,9 +43,16 @@ async function updateAcademyPanel(client) {
       const eventButtons = new ActionRowBuilder();
 
       scheduledEvents.forEach((event, index) => {
-        // Formata a descrição de cada aula
-        eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)\n`;
-        // Adiciona um botão de inscrição para cada aula
+        // Lógica para mudar o texto da data/status
+        let timeText;
+        if (event.status === 'agendada') {
+            timeText = `**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)`;
+        } else {
+            timeText = `**Status:** 🟢 Acontecendo Agora!`;
+        }
+
+        eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n${timeText}\n`;
+        
         eventButtons.addComponents(
             new ButtonBuilder()
                 .setCustomId(`academy_enroll_event|${event.event_id}`)
@@ -54,7 +61,7 @@ async function updateAcademyPanel(client) {
         );
       });
       embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: eventsDescription });
-      components.push(eventButtons);
+      if(eventButtons.components.length > 0) components.push(eventButtons);
     } else {
       embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: '`Nenhuma aula agendada no momento. Solicite um curso do catálogo!`' });
     }
@@ -67,7 +74,7 @@ async function updateAcademyPanel(client) {
         .setEmoji('📚')
     );
     components.push(catalogButton);
-    // --- FIM DA LÓGICA ATUALIZADA ---
+    // --- FIM DA MODIFICAÇÃO ---
 
     await message.edit({ content: '', embeds: [embed], components: components });
   } catch (error) {

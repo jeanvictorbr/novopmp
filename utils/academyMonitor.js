@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 const db = require('../database/db.js');
+const { updateAcademyPanel } = require('./updateAcademyPanel.js');
 
 async function cancelEnrollment(guild, course, userId, reason) {
     try {
@@ -34,6 +35,7 @@ async function academyMonitor(client) {
 
             if (timeUntilStart > 0 && timeUntilStart <= 1800) { // 30 minutos
                 await db.run("UPDATE academy_events SET status = 'iniciando' WHERE event_id = $1", [event.event_id]);
+                await updateAcademyPanel(client);
 
                 const voiceChannel = await guild.channels.create({
                     name: `🗣️ Aula - ${course.name.substring(0, 80)}`,

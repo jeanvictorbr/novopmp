@@ -1,4 +1,5 @@
 const db = require('../../../database/db.js');
+const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 module.exports = {
@@ -34,6 +35,7 @@ module.exports = {
         
         // Atualiza o status no banco de dados
         await db.run("UPDATE academy_events SET status = 'finalizada' WHERE event_id = $1", [eventId]);
+        await updateAcademyPanel(interaction.client);
 
         await interaction.followUp({ content: '✅ A aula foi finalizada e o canal de voz removido.', ephemeral: true });
 

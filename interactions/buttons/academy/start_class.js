@@ -1,4 +1,5 @@
 const db = require('../../../database/db.js');
+const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
 
 module.exports = {
     customId: (customId) => customId.startsWith('academy_start_class_'),
@@ -8,6 +9,7 @@ module.exports = {
 
         // Altera o status da aula no banco de dados
         await db.run("UPDATE academy_events SET status = 'em_progresso' WHERE event_id = $1", [eventId]);
+        await updateAcademyPanel(interaction.client);
 
         await interaction.followUp({ content: '✅ A aula foi iniciada! O período de tolerância foi encerrado.', ephemeral: true });
         
