@@ -8,12 +8,16 @@ module.exports = {
 
     try {
         const now = Math.floor(Date.now() / 1000);
+
+        // --- INÍCIO DA CORREÇÃO ---
+        // A consulta agora busca por aulas com status 'agendada' OU 'iniciando'.
         const scheduledEvents = await db.all(`
             SELECT event_id, title, event_time 
             FROM academy_events 
-            WHERE event_time > $1 AND status = 'scheduled'
+            WHERE event_time > $1 AND (status = 'agendada' OR status = 'iniciando')
             ORDER BY event_time ASC`, 
         [now]);
+        // --- FIM DA CORREÇÃO ---
 
         if (scheduledEvents.length === 0) {
             return await interaction.editReply('Não há aulas futuras agendadas para gerenciar.');
