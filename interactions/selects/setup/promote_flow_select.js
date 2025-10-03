@@ -4,12 +4,14 @@ const db = require('../../../database/db.js');
 module.exports = {
     customId: (customId) => customId.startsWith('promote_select_'),
     async execute(interaction) {
-        await interaction.deferUpdate();
-
+        // Separa a lógica para cada etapa do fluxo
         const parts = interaction.customId.split('_');
         const step = parts[2];
         
+        // Etapa 2: O admin selecionou o OFICIAL. Agora, mostramos o menu para selecionar o NOVO CARGO.
         if (step === 'user') {
+            await interaction.deferUpdate(); // Apenas acusa o recebimento da seleção do usuário
+
             const userId = interaction.values[0];
             const member = await interaction.guild.members.fetch(userId);
 
@@ -30,11 +32,9 @@ module.exports = {
             } else {
                 let currentIdInChain = memberHighestRole.id;
                 const visited = new Set(); 
-
                 while (currentIdInChain && !visited.has(currentIdInChain)) {
                     visited.add(currentIdInChain);
                     const nextStep = allCareerRoles.find(r => r.previous_role_id === currentIdInChain);
-                    
                     if (nextStep) {
                         promotableRoleIds.push(nextStep.role_id);
                         currentIdInChain = nextStep.role_id;
@@ -56,20 +56,18 @@ module.exports = {
                     value: role.id,
                 }));
 
-            // --- INÍCIO DA MODIFICAÇÃO DE TEXTO ---
             const nextRole = roleOptions.length > 0 ? interaction.guild.roles.cache.get(roleOptions[0].value) : null;
             let contentMessage;
             let placeholder = 'Selecione o novo cargo...';
 
             if (memberHighestRole && nextRole) {
-                contentMessage = `***O oficial que voc selecionou, possui o cargo ${memberHighestRole.toString()}. De acordo com o sistema, a sua próxima patente é ${nextRole.toString()}.\n\nSelecione abaixo o cargo desejado (é possível pular patentes).***`;
+                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}. De acordo com o sistema, a sua próxima patente é ${nextRole.toString()}.\n\nSelecione abaixo o cargo desejado (é possível pular patentes).`;
                 placeholder = `Sugestão: Promover para ${nextRole.name}`;
             } else if (memberHighestRole) {
-                contentMessage = `***O oficial possui o cargo ${memberHighestRole.toString()}, mas não há promoções futuras configuradas para esta patente.***`;
+                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}, mas não há promoções futuras configuradas para esta patente.`;
             } else {
-                contentMessage = `***O oficial não possui um cargo de carreira. Selecione o cargo de ingresso na lista abaixo.***`;
+                contentMessage = `O oficial não possui um cargo de carreira. Selecione o cargo de ingresso na lista abaixo.`;
             }
-            // --- FIM DA MODIFICAÇÃO DE TEXTO ---
 
             const menu = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
@@ -81,7 +79,11 @@ module.exports = {
             await interaction.editReply({ content: contentMessage, components: [menu] });
         }
         
+        // Etapa 3: O admin selecionou o NOVO CARGO. Agora, abrimos o MODAL para a justificativa.
         if (step === 'newrole') {
+            // Nesta etapa, a interação é a seleção do menu. A primeira resposta é abrir o modal.
+            // Não usamos deferUpdate() aqui.
+
             const userId = parts[3];
             const newRoleId = interaction.values[0];
             
@@ -97,6 +99,8 @@ module.exports = {
                 .setRequired(true);
                 
             modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+            
+            // A única resposta para esta interação é mostrar o modal.
             await interaction.showModal(modal);
         }
     }
