@@ -18,6 +18,16 @@ module.exports = {
             // Apenas remove o usuário da lista de inscrições
             await db.run('DELETE FROM academy_enrollments WHERE user_id = $1 AND course_id = $2', [userId, courseId]);
 
+            // --- INÍCIO DA MODIFICAÇÃO ---
+            // Adicionada a lógica para remover o membro do tópico de discussão
+            if (course.thread_id) {
+                const thread = await interaction.guild.channels.fetch(course.thread_id).catch(() => null);
+                if (thread) {
+                    await thread.members.remove(userId, 'Reprovado no curso.').catch(console.error);
+                }
+            }
+            // --- FIM DA MODIFICAÇÃO ---
+
             // Atualiza o painel para remover o usuário da lista
             const updatedEnrollments = await db.all('SELECT * FROM academy_enrollments WHERE course_id = $1', [courseId]);
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, updatedEnrollments);
