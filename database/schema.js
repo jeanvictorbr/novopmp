@@ -166,8 +166,11 @@ const schemaSQL = `
         scheduled_at BIGINT NOT NULL,
         event_time BIGINT NOT NULL,
         title TEXT,
-        status TEXT DEFAULT 'scheduled'
+        status TEXT DEFAULT 'agendada',
+        voice_channel_id VARCHAR(255),
+        control_message_id VARCHAR(255)
     );
+
     CREATE TABLE IF NOT EXISTS rank_requirements (
         role_id VARCHAR(255) PRIMARY KEY,
         previous_role_id VARCHAR(255) NOT NULL,

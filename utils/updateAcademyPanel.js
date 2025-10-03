@@ -17,22 +17,25 @@ async function updateAcademyPanel(client) {
     if (!message) return;
 
     const now = Math.floor(Date.now() / 1000);
+    
+    // --- LÓGICA ATUALIZADA ---
+    // Busca as próximas 4 aulas com status 'agendada'
     const scheduledEvents = await db.all(
       `SELECT ae.*, ac.name 
        FROM academy_events ae 
        JOIN academy_courses ac ON ae.course_id = ac.course_id 
-       WHERE ae.event_time > $1 AND ae.status = 'scheduled' 
+       WHERE ae.event_time > $1 AND ae.status = 'agendada' 
        ORDER BY ae.event_time ASC LIMIT 4`,
       [now]
     );
 
     const embed = new EmbedBuilder()
       .setColor('Gold')
-      .setAuthor({ name: guild.name, iconURL: guild.iconURL() }) // FOTO DA GUILD
+      .setAuthor({ name: guild.name, iconURL: guild.iconURL() })
       .setTitle('🎓 Academia de Polícia - Central de Cursos')
       .setDescription('Bem-vindo, oficial! Inscreva-se nas próximas aulas ou explore nosso catálogo completo de cursos.')
-      .setImage(SETUP_EMBED_IMAGE_URL) // NOSSA IMAGEM PADRÃO
-      .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL }); // NOSSO RODAPÉ PADRÃO
+      .setImage(SETUP_EMBED_IMAGE_URL)
+      .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
 
     const components = [];
     if (scheduledEvents.length > 0) {
@@ -40,7 +43,9 @@ async function updateAcademyPanel(client) {
       const eventButtons = new ActionRowBuilder();
 
       scheduledEvents.forEach((event, index) => {
+        // Formata a descrição de cada aula
         eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)\n`;
+        // Adiciona um botão de inscrição para cada aula
         eventButtons.addComponents(
             new ButtonBuilder()
                 .setCustomId(`academy_enroll_event|${event.event_id}`)
@@ -62,6 +67,7 @@ async function updateAcademyPanel(client) {
         .setEmoji('📚')
     );
     components.push(catalogButton);
+    // --- FIM DA LÓGICA ATUALIZADA ---
 
     await message.edit({ content: '', embeds: [embed], components: components });
   } catch (error) {
