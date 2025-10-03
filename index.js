@@ -94,7 +94,7 @@ client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
 
 client.once(Events.ClientReady, readyClient => {
     setInterval(() => punishmentMonitor(readyClient), 20000);
-    setInterval(() => patrolMonitor(readyClient), 30000);
+    setInterval(() => patrolMonitor(readyClient), 9000);
     setInterval(() => dashboardMonitor(readyClient), 5000);
     setInterval(() => hierarchyMonitor(readyClient), 180000);
     setInterval(() => updateAcademyPanel(readyClient), 60000);

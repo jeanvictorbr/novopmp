@@ -1,10 +1,13 @@
-const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder, RoleSelectMenuBuilder } = require('discord.js');
+const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder, RoleSelectMenuBuilder, PermissionsBitField } = require('discord.js'); // ADICIONADO: PermissionsBitField
 const db = require('../database/db.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('certificar')
-        .setDescription('Certifica um oficial em um curso da academia.'),
+        .setDescription('Certifica um oficial em um curso da academia.')
+        // --- LINHA ADICIONADA ---
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+        
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
 
