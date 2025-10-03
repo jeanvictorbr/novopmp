@@ -9,7 +9,9 @@ async function checkAndAwardAchievements(client) {
         const guild = client.guilds.cache.first();
         if (!guild) return;
 
-        const members = await guild.members.fetch();
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Trocado 'guild.members.fetch()' por 'guild.members.cache' para evitar timeouts.
+        const members = guild.members.cache;
 
         for (const member of members.values()) {
             if (member.user.bot) continue;
@@ -62,7 +64,7 @@ async function checkAndAwardAchievements(client) {
                 }
             }
 
-            // --- NOVA LÓGICA: Loop para REMOVER conquistas ---
+            // --- LÓGICA: Loop para REMOVER conquistas ---
             for (const unlocked of unlockedAchievements) {
                 const currentProgress = await getProgress(unlocked.type);
 
