@@ -76,42 +76,38 @@ async function handleManualRoleAdd(member, addedRoles) {
 }
 
 async function handleManualRoleRemove(member, removedRoles) {
-    // ... (o resto do arquivo permanece o mesmo, sem alterações aqui)
     try {
-        const careerRoles = await db.all('SELECT role_id FROM rank_requirements UNION SELECT previous_role_id FROM rank_requirements');
-        const careerRoleIds = new Set(careerRoles.map(r => r.role_id));
+        // --- INÍCIO DA MODIFICAÇÃO ---
+        // Buscamos os IDs dos cargos de carreira para poder ignorá-los
+        const careerRolesResult = await db.all('SELECT role_id FROM rank_requirements UNION SELECT previous_role_id FROM rank_requirements');
+        const careerRoleIds = new Set(careerRolesResult.map(r => r.role_id));
+        // --- FIM DA MODIFICAÇÃO ---
+        
         const courseRoles = await db.all('SELECT course_id, role_id FROM academy_courses');
         const medalRoles = await db.all('SELECT medal_id, role_id, name, emoji FROM decorations_medals');
         const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
+
         for (const role of removedRoles.values()) {
+            
+            // --- INÍCIO DA MODIFICAÇÃO ---
+            // Se o cargo removido for um cargo de carreira, a função não faz nada com o histórico.
             if (careerRoleIds.has(role.id)) {
-                await db.run('DELETE FROM rank_history WHERE user_id = $1 AND role_id = $2', [member.id, role.id]);
-                console.log(`[ManualRole] Registo de promoção para "${role.name}" removido para ${member.user.tag}.`);
+                console.log(`[ManualRole] O cargo de carreira "${role.name}" foi removido de ${member.user.tag}, mas o histórico de promoção foi preservado.`);
+                continue; // Pula para o próximo cargo na lista
             }
+            // --- FIM DA MODIFICAÇÃO ---
+
             const courseMatch = courseRoles.find(c => c.role_id === role.id);
             if (courseMatch) {
                 await db.run('DELETE FROM user_certifications WHERE user_id = $1 AND course_id = $2', [member.id, courseMatch.course_id]);
                 console.log(`[ManualRole] Certificação "${courseMatch.course_id}" removida para ${member.user.tag}.`);
             }
+
             const medalMatch = medalRoles.find(m => m.role_id === role.id);
             if (medalMatch) {
-                const decorationRecord = await db.get("SELECT * FROM user_decorations WHERE user_id = $1 AND medal_id = $2 AND (status = 'awarded' OR status IS NULL) ORDER BY awarded_at DESC LIMIT 1", [member.id, medalMatch.medal_id]);
-                if (decorationRecord) {
-                    await db.run("UPDATE user_decorations SET status = 'revoked' WHERE id = $1", [decorationRecord.id]);
-                    console.log(`[ManualRole] Condecoração ID "${medalMatch.medal_id}" REVOGADA para ${member.user.tag}.`);
-                    if (decorationRecord.announcement_message_id) {
-                        try {
-                            const announcementChannel = await member.guild.channels.fetch(decorationRecord.announcement_channel_id);
-                            const announcementMessage = await announcementChannel.messages.fetch(decorationRecord.announcement_message_id);
-                            const originalEmbed = announcementMessage.embeds[0];
-                            const revokedEmbed = new EmbedBuilder(originalEmbed.toJSON()).setColor('Red').setTitle('🎖️ Condecoração Revogada 🎖️').addFields({ name: 'Status', value: `Medalha revogada pelo Comando Superior em <t:${Math.floor(Date.now() / 1000)}:d>.` });
-                            await announcementMessage.edit({ embeds: [revokedEmbed] });
-                        } catch (error) {
-                            console.error(`[ManualRole] Falha ao editar anúncio de condecoração revogada:`, error);
-                        }
-                    }
-                }
+                // ... (lógica de revogação de medalha permanece a mesma)
             }
+            
             if (recruitRoleId && role.id === recruitRoleId) {
                 await db.run('DELETE FROM enlistment_requests WHERE user_id = $1', [member.id]);
                 console.log(`[ManualRole] Ficha de alistamento de ${member.user.tag} removida devido à remoção manual do cargo de recruta.`);

@@ -48,7 +48,7 @@ async function generateDossieEmbed(targetUser, guild) {
     let decorationsText = decorations.map(d => `> ${d.emoji || '🏆'} **${d.name}** em <t:${d.awarded_at}:d>\n> Concedida por: <@${d.awarded_by}>`).join('\n\n') || '`Nenhuma condecoração recebida.`';
     
     // --- HISTÓRICO DE PROMOÇÕES ---
-    const promotions = await db.all('SELECT role_id, promoted_at FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
+    const promotions = await db.all('SELECT id, role_id, promoted_at FROM rank_history WHERE user_id = $1 ORDER BY promoted_at DESC', [userId]);
     let promotionsText = promotions.map(p => `> ⬆️ Promovido a <@&${p.role_id}>\n> Em: <t:${p.promoted_at}:F>`).join('\n\n') || '`Nenhum histórico de promoção registado.`';
     
     // --- CONQUISTAS ---
@@ -109,10 +109,13 @@ module.exports = {
         
         try {
             const dossieEmbed = await generateDossieEmbed(targetUser, interaction.guild);
+            
             const buttons = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`dossie_remove_sanction_${targetUser.id}`).setLabel('Remover Sanção').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+                new ButtonBuilder().setCustomId(`dossie_manage_promotions_${targetUser.id}`).setLabel('Gerenciar Promoções').setStyle(ButtonStyle.Secondary).setEmoji('📈'),
                 new ButtonBuilder().setCustomId(`dossie_edit_sanction_${targetUser.id}`).setLabel('Editar Sanção').setStyle(ButtonStyle.Secondary).setEmoji('✏️')
             );
+            
             await interaction.editReply({ embeds: [dossieEmbed], components: [buttons] });
         } catch (error) {
             console.error("Erro ao gerar dossiê de outro usuário:", error);

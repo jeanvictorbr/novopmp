@@ -17,7 +17,19 @@ module.exports = {
         }
 
         try {
+            // --- INÍCIO DA MODIFICAÇÃO ---
+            // Passo 1: Adicionar o novo cargo
             await officer.roles.add(newRole);
+
+            // Passo 2: Descobrir e remover o cargo anterior
+            const rankRequirement = await db.get('SELECT previous_role_id FROM rank_requirements WHERE role_id = $1', [newRoleId]);
+            if (rankRequirement && rankRequirement.previous_role_id) {
+                const previousRole = await interaction.guild.roles.fetch(rankRequirement.previous_role_id).catch(() => null);
+                if (previousRole && officer.roles.cache.has(previousRole.id)) {
+                    await officer.roles.remove(previousRole, `Promovido para ${newRole.name}`);
+                }
+            }
+            // --- FIM DA MODIFICAÇÃO ---
 
             const promotionTimestamp = Math.floor(Date.now() / 1000);
             await db.run(
@@ -53,7 +65,7 @@ module.exports = {
                     await announcementMessage.react('✅');
                 }
             }
-            await interaction.editReply(`✅ **${officer.displayName}** foi promovido para **${newRole.name}**! O anúncio foi publicado.`);
+            await interaction.editReply(`✅ **${officer.displayName}** foi promovido para **${newRole.name}**! O anúncio foi publicado e o cargo anterior removido.`);
             
         } catch (error) {
             console.error('Erro ao promover:', error);
