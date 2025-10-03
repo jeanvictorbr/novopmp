@@ -18,9 +18,8 @@ module.exports = {
                 return await interaction.editReply('❌ Oficial ou medalha não encontrado(a).');
             }
 
-            // 1. Dar o cargo da medalha ao oficial
-            await officer.roles.add(medal.role_id, `Condecorado com: ${medal.name}`);
-
+            // --- INÍCIO DA CORREÇÃO ---
+            // Passo 1: Enviar o anúncio público primeiro para obter as IDs
             let announcementMessage = null;
             const channelId = (await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'"))?.value;
             if (channelId) {
@@ -42,9 +41,9 @@ module.exports = {
                 }
             }
 
-            // 2. Salvar o registro no banco de dados, agora incluindo as IDs da mensagem
+            // Passo 2: Salvar o registro completo no banco de dados ANTES de dar o cargo
             await db.run(
-                'INSERT INTO user_decorations (user_id, medal_id, awarded_by, awarded_at, reason, announcement_channel_id, announcement_message_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                'INSERT INTO user_decorations (user_id, medal_id, awarded_by, awarded_at, reason, announcement_channel_id, announcement_message_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                 [
                     officer.id, 
                     medal.medal_id, 
@@ -52,9 +51,14 @@ module.exports = {
                     Math.floor(Date.now() / 1000), 
                     reason,
                     announcementMessage?.channel.id,
-                    announcementMessage?.id
+                    announcementMessage?.id,
+                    'awarded'
                 ]
             );
+
+            // Passo 3: Adicionar o cargo ao oficial por último
+            await officer.roles.add(medal.role_id, `Condecorado com: ${medal.name}`);
+            // --- FIM DA CORREÇÃO ---
 
             await interaction.editReply(`✅ **${officer.displayName}** foi condecorado com a medalha **${medal.name}**! O anúncio foi publicado.`);
 
