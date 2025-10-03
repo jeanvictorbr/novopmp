@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
+const { academyMonitor } = require('./utils/academyMonitor.js');
 require('dotenv-flow').config();
 
 // IMPORTAÇÃO DOS MÓDULOS PRINCIPAIS
@@ -99,6 +100,7 @@ client.once(Events.ClientReady, readyClient => {
     setInterval(() => hierarchyMonitor(readyClient), 180000);
     setInterval(() => updateAcademyPanel(readyClient), 60000);
     setInterval(() => achievementMonitor(readyClient), 30000);
+    setInterval(() => academyMonitor(readyClient), 10000);
     console.log('[INFO] Todos os monitores foram ativados.');
     console.log(`\n---\nLogado como ${readyClient.user.tag}\n---`);
 });
