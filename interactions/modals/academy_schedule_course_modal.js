@@ -1,11 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
-// CORREÇÃO: O caminho foi ajustado de '../../../' para '../../' para encontrar a pasta correta.
 const db = require('../../database/db.js');
 const { updateAcademyPanel } = require('../../utils/updateAcademyPanel.js');
-const { SETUP_FOOTER_TEXT, SETUP_FOOTER_ICON_URL } = require('../../views/setup_views.js');
 
 module.exports = {
-  customId: (id) => id.startsWith('academy_schedule_course_modal'), // Ajustado para lidar com IDs dinâmicos, se necessário
+  customId: (id) => id.startsWith('academy_schedule_course_modal'),
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
@@ -30,9 +28,10 @@ module.exports = {
 
       const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
 
+      // Atualiza a query para incluir o status inicial
       await db.run(
-        'INSERT INTO academy_events (course_id, guild_id, scheduled_by, scheduled_at, event_time, title) VALUES ($1, $2, $3, $4, $5, $6)',
-        [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), eventTimestamp, title]
+        'INSERT INTO academy_events (course_id, guild_id, scheduled_by, scheduled_at, event_time, title, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), eventTimestamp, title, 'agendada']
       );
       
       if (course.thread_id) {
@@ -41,17 +40,18 @@ module.exports = {
             const enrollments = await db.all('SELECT user_id FROM academy_enrollments WHERE course_id = $1', [courseId]);
             const mentionString = enrollments.map(e => `<@${e.user_id}>`).join(' ');
 
+            // --- A NOVA EMBED DE ANÚNCIO ---
             const notificationEmbed = new EmbedBuilder()
-                .setColor('Green')
-                .setTitle('📢 Nova Aula Agendada!')
+                .setColor('Gold')
+                .setTitle('📢 BOAS NOTÍCIAS, TURMA! 📢')
                 .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-                .setDescription(`Atenção, turma! Uma nova aula para o curso **${course.name}** foi agendada.`)
+                .setDescription(`O curso de **${course.name}** foi agendado!`)
                 .addFields(
-                    { name: 'Aula', value: title, inline: true },
                     { name: 'Instrutor', value: interaction.user.toString(), inline: true },
-                    { name: 'Data', value: `<t:${eventTimestamp}:F> (<t:${eventTimestamp}:R>)` }
+                    { name: 'Data e Hora', value: `<t:${eventTimestamp}:F> (<t:${eventTimestamp}:R>)`, inline: true },
+                    { name: 'REGRAS IMPORTANTES', value: '> **1.** 30 minutos antes da aula, um canal de voz será criado e postado aqui.\n> **2.** A presença no canal de voz será **obrigatória** nos primeiros 20 minutos.\n> **3.** Ausentes terão a inscrição cancelada automaticamente.' }
                 )
-                .setFooter({ text: SETUP_FOOTER_TEXT, iconURL: SETUP_FOOTER_ICON_URL });
+                .setFooter({ text: 'Preparem-se, oficiais!' });
             
             await thread.send({ content: mentionString.length > 0 ? `Atenção, inscritos: ${mentionString}` : 'Nova aula agendada!', embeds: [notificationEmbed] });
         }
