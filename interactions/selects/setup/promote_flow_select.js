@@ -61,12 +61,12 @@ module.exports = {
             let placeholder = 'Selecione o novo cargo...';
 
             if (memberHighestRole && nextRole) {
-                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}. De acordo com o sistema, a sua próxima patente é ${nextRole.toString()}.\n\nSelecione abaixo o cargo desejado (é possível pular patentes).`;
+                contentMessage = `***O oficial que vc selecionou, possui o cargo ${memberHighestRole.toString()}. De acordo com o sistema, a sua próxima patente é ${nextRole.toString()}.\n\nSelecione abaixo o cargo desejado (é possível pular patentes).***`;
                 placeholder = `Sugestão: Promover para ${nextRole.name}`;
             } else if (memberHighestRole) {
-                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}, mas não há promoções futuras configuradas para esta patente.`;
+                contentMessage = `***O oficial possui o cargo ${memberHighestRole.toString()}, mas não há promoções futuras configuradas para esta patente.***`;
             } else {
-                contentMessage = `O oficial não possui um cargo de carreira. Selecione o cargo de ingresso na lista abaixo.`;
+                contentMessage = `***O oficial não possui um cargo de carreira. Selecione o cargo de ingresso na lista abaixo.***`;
             }
 
             const menu = new ActionRowBuilder().addComponents(
