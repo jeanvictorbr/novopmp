@@ -120,7 +120,9 @@ const schemaSQL = `
         medal_id INTEGER REFERENCES decorations_medals(medal_id) ON DELETE CASCADE,
         awarded_by VARCHAR(255) NOT NULL,
         awarded_at BIGINT NOT NULL,
-        reason TEXT
+        reason TEXT,
+        announcement_channel_id VARCHAR(255),
+        announcement_message_id VARCHAR(255)
     );
     CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
         role_id VARCHAR(255) PRIMARY KEY
