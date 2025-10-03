@@ -2,7 +2,6 @@ const { getCourseEnrollmentDashboardPayload } = require('../../../views/setup_vi
 const db = require('../../../database/db.js');
 const { EmbedBuilder } = require('discord.js');
 
-// Função de notificação (pode ser movida para um arquivo de utilitários no futuro)
 async function sendCertificationNotification(interaction, member, course) {
     const timestamp = Math.floor(Date.now() / 1000);
     try {
@@ -72,7 +71,6 @@ module.exports = {
             }
 
             // --- CORREÇÃO DO BUG ---
-            // Em vez de editar a mensagem original, agora ele edita a resposta da interação, o que é mais estável.
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, []);
             await interaction.editReply(updatedDashboard);
             
