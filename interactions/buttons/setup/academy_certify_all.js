@@ -2,6 +2,7 @@ const { getCourseEnrollmentDashboardPayload } = require('../../../views/setup_vi
 const db = require('../../../database/db.js');
 const { EmbedBuilder } = require('discord.js');
 
+// Função de notificação (pode ser movida para um arquivo de utilitários no futuro)
 async function sendCertificationNotification(interaction, member, course) {
     const timestamp = Math.floor(Date.now() / 1000);
     try {
@@ -70,9 +71,10 @@ module.exports = {
                 await sendCertificationNotification(interaction, member, course);
             }
 
-            // FLUXO CORRIGIDO
-            const updatedDashboard = await getCourseEnrollmentDashboardPayload(course, interaction.guild, []);
-            await interaction.message.edit(updatedDashboard);
+            // --- CORREÇÃO DO BUG ---
+            // Em vez de editar a mensagem original, agora ele edita a resposta da interação, o que é mais estável.
+            const updatedDashboard = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, []);
+            await interaction.editReply(updatedDashboard);
             
             await interaction.followUp({ content: `✅ **${validMembers.length}** oficiais foram certificados e notificados. O painel foi atualizado.`, ephemeral: true });
 

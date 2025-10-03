@@ -137,42 +137,45 @@ async function getAcademyMenuPayload(db) {
     return { embeds: [embed], components: [courseManagementButtons, scheduleButtons, certificationButtons, configButtons1, configButtons2] };
 }
 
-async function getCourseEnrollmentDashboardPayload(course, guild, enrollments) {
+// --- FUNÇÃO MODIFICADA ---
+async function getCourseEnrollmentDashboardPayload(db, guild, course, enrollments) {
   const embed = new EmbedBuilder()
     .setColor('Green')
     .setTitle(`Dashboard de Inscrições: ${course.name}`)
-    .setDescription('Aprove ou recuse os oficiais inscritos no curso.')
     .setImage(SETUP_EMBED_IMAGE_URL)
-    .setFooter({ text: 'Certifique apenas os oficiais que completaram o curso.', iconURL: SETUP_FOOTER_ICON_URL });
-  const options = await Promise.all(enrollments.map(async (e) => {
-    const member = await guild.members.fetch(e.user_id).catch(() => null);
-    if (!member) return null;
-    return {
-      label: member.user.username,
-      description: `Inscrito em: ${new Date(e.enrollment_date * 1000).toLocaleDateString()}`,
-      value: e.user_id,
-    };
-  }));
-  const validOptions = options.filter(Boolean);
-  if (validOptions.length === 0) {
+    .setFooter({ text: 'Aprove ou recuse os oficiais inscritos no curso.', iconURL: SETUP_FOOTER_ICON_URL });
+
+  const components = [];
+  
+  if (enrollments.length > 0) {
+    embed.setDescription('Gerencie individualmente os oficiais inscritos ou aprove todos de uma vez.');
+    
+    for (const enrollment of enrollments) {
+        const member = await guild.members.fetch(enrollment.user_id).catch(() => null);
+        if (member) {
+            embed.addFields({
+                name: member.displayName,
+                value: `Inscrito em: <t:${enrollment.enrollment_date}:d>`,
+                inline: false
+            });
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`academy_approve_${course.course_id}_${member.id}`).setLabel('Aprovar').setStyle(ButtonStyle.Success).setEmoji('✅'),
+                new ButtonBuilder().setCustomId(`academy_reject_${course.course_id}_${member.id}`).setLabel('Reprovar').setStyle(ButtonStyle.Danger).setEmoji('❌')
+            );
+            components.push(row);
+        }
+    }
+  } else {
     embed.setDescription('Nenhum oficial inscrito neste curso no momento.');
   }
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`academy_certify_member_select_${course.course_id}`)
-    .setPlaceholder('Selecione um oficial para certificar...')
-    .addOptions(validOptions.length > 0 ? validOptions : [{ label: 'Nenhum inscrito', value: 'none', disabled: true }]);
-  const approveAllButton = new ButtonBuilder()
-    .setCustomId(`academy_certify_all_${course.course_id}`)
-    .setLabel('Aprovar Todos')
-    .setStyle(ButtonStyle.Success)
-    .setEmoji('✅')
-    .setDisabled(validOptions.length === 0);
-  const actionRow = new ActionRowBuilder().addComponents(selectMenu);
-  const buttonRow = new ActionRowBuilder().addComponents(
-    approveAllButton,
+
+  const generalActions = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`academy_certify_all_${course.course_id}`).setLabel('Aprovar Todos').setStyle(ButtonStyle.Primary).setEmoji('🎖️').setDisabled(enrollments.length === 0),
     new ButtonBuilder().setCustomId('back_to_academy_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [actionRow, buttonRow] };
+  components.push(generalActions);
+
+  return { embeds: [embed], components: components };
 }
 
 async function getQuizHubPayload(db) {
