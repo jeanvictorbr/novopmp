@@ -32,16 +32,20 @@ async function academyMonitor(client) {
             const thread = await guild.channels.fetch(course.thread_id).catch(() => null);
             if (!thread) continue;
 
-            // Lógica de 30 minutos antes: criar canal e enviar painel de controle
             if (timeUntilStart > 0 && timeUntilStart <= 1800) { // 30 minutos
                 await db.run("UPDATE academy_events SET status = 'iniciando' WHERE event_id = $1", [event.event_id]);
 
+                // --- INÍCIO DA CORREÇÃO ---
+                // O 'parent' do canal de voz agora é o 'parentId' do canal pai do tópico,
+                // que é a categoria correta.
                 const voiceChannel = await guild.channels.create({
                     name: `🗣️ Aula - ${course.name.substring(0, 80)}`,
                     type: ChannelType.GuildVoice,
-                    parent: thread.parent,
+                    parent: thread.parent.parentId, 
                     reason: `Canal temporário para a aula ID: ${event.event_id}`
                 });
+                // --- FIM DA CORREÇÃO ---
+
                 await db.run("UPDATE academy_events SET voice_channel_id = $1 WHERE event_id = $2", [voiceChannel.id, event.event_id]);
                 
                 const controlEmbed = new EmbedBuilder().setColor('Green').setTitle('🟢 AULA PRESTES A COMEÇAR!').setDescription(`Atenção, turma! A aula **${event.title}** começará em breve. A entrada no canal de voz é obrigatória.\n\n> **Clique aqui para entrar:** ${voiceChannel.toString()}`).addFields({ name: 'Período de Tolerância', value: 'Você tem **20 minutos** para entrar na chamada. Após isso, sua inscrição será cancelada.' });
@@ -55,7 +59,6 @@ async function academyMonitor(client) {
                 continue;
             }
             
-            // Lógica de lembretes (2 horas antes)
             if (timeUntilStart > 1800 && timeUntilStart <= 7200) { // Entre 30 mins e 2 horas
                 const minutesUntil = Math.round(timeUntilStart / 60);
                 if (minutesUntil % 30 === 0 && minutesUntil !== (event.last_reminder_sent_at || 0)) {
@@ -77,7 +80,7 @@ async function academyMonitor(client) {
             const membersInCallIds = new Set(voiceChannel.members.map(m => m.id));
             const timeSinceStart = now - event.event_time;
 
-            if (event.status === 'iniciando' && timeSinceStart >= 1200) { // 20 minutos
+            if (event.status === 'iniciando' && timeSinceStart >= 1200) {
                 for (const enrollment of enrollments) {
                     if (!membersInCallIds.has(enrollment.user_id)) {
                         await cancelEnrollment(guild, course, enrollment.user_id, 'Ausência no início da aula');
