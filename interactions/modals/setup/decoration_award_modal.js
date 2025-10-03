@@ -21,13 +21,7 @@ module.exports = {
             // 1. Dar o cargo da medalha ao oficial
             await officer.roles.add(medal.role_id, `Condecorado com: ${medal.name}`);
 
-            // 2. Salvar o registro no banco de dados
-            await db.run(
-                'INSERT INTO user_decorations (user_id, medal_id, awarded_by, awarded_at, reason) VALUES ($1, $2, $3, $4, $5)',
-                [officer.id, medal.medal_id, awardedBy.id, Math.floor(Date.now() / 1000), reason]
-            );
-
-            // 3. Enviar o anúncio público
+            let announcementMessage = null;
             const channelId = (await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'"))?.value;
             if (channelId) {
                 const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
@@ -44,9 +38,23 @@ module.exports = {
                         )
                         .setTimestamp()
                         .setFooter({ text: 'Comando Superior' });
-                    await channel.send({ embeds: [embed] });
+                    announcementMessage = await channel.send({ embeds: [embed] });
                 }
             }
+
+            // 2. Salvar o registro no banco de dados, agora incluindo as IDs da mensagem
+            await db.run(
+                'INSERT INTO user_decorations (user_id, medal_id, awarded_by, awarded_at, reason, announcement_channel_id, announcement_message_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [
+                    officer.id, 
+                    medal.medal_id, 
+                    awardedBy.id, 
+                    Math.floor(Date.now() / 1000), 
+                    reason,
+                    announcementMessage?.channel.id,
+                    announcementMessage?.id
+                ]
+            );
 
             await interaction.editReply(`✅ **${officer.displayName}** foi condecorado com a medalha **${medal.name}**! O anúncio foi publicado.`);
 
