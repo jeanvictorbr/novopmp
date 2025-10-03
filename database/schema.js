@@ -158,6 +158,7 @@ const schemaSQL = `
         passed BOOLEAN NOT NULL,
         attempt_date BIGINT
     );
+
     CREATE TABLE IF NOT EXISTS academy_events (
         event_id SERIAL PRIMARY KEY,
         course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
