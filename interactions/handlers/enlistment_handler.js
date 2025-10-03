@@ -37,7 +37,7 @@ async function saveQuestions(quizId, questions) {
 }
 
 //======================================================================
-// LÓGICA COMPLETA DO QUIZ (QUE ESTAVA EM FALTA)
+// LÓGICA COMPLETA DO QUIZ
 //======================================================================
 
 async function startQuiz(interaction) {
@@ -153,13 +153,11 @@ async function endQuiz(interaction, channel, quizState) {
     const finalScore = (correctAnswers / quizState.questions.length) * 100;
     const passed = finalScore >= quizState.quiz.passing_score;
 
-    // --- EMBED PARA O UTILIZADOR (AGORA COM CONTAGEM DE ACERTOS) ---
     const resultEmbed = new EmbedBuilder()
         .setTitle('Resultado da Prova Teórica')
         .setColor(passed ? 'Green' : 'Red')
         .setThumbnail(passed ? 'https://i.imgur.com/7S7R0Zt.png' : 'https://i.imgur.com/c33a49R.png')
         .addFields(
-            // --- CAMPO DE ACERTOS ADICIONADO AQUI ---
             { name: 'Acertos', value: `\`${correctAnswers} de ${quizState.questions.length}\``, inline: true },
             { name: 'Sua Nota', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
             { name: 'Status', value: passed ? '✅ **APROVADO**' : '❌ **REPROVADO**', inline: true }
@@ -194,45 +192,7 @@ async function sendLog(interaction, quizState, finalScore, passed) {
 
     const channel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
     if (!channel) return;
-
-    // --- RESUMO DAS RESPOSTAS CONSTRUÍDO AQUI PARA O LOG DO ADMIN ---
-    let summary = '';
-    quizState.questions.forEach((q, index) => {
-        const userAnswer = quizState.answers[index];
-        const isCorrect = q.correct.toUpperCase() === userAnswer;
-        const emoji = isCorrect ? '✅' : '❌';
-        const questionTitle = q.question.length > 40 ? `${q.question.substring(0, 40)}...` : q.question;
-        summary += `${emoji} **Q${index + 1}:** ${questionTitle}\n> Resposta: \`${userAnswer}\` | Correta: \`${q.correct}\`\n`;
-    });
-
-    const embed = new EmbedBuilder()
-        .setTitle(passed ? 'Relatório de Prova Teórica - Aprovado' : 'Relatório de Prova Teórica - Reprovado')
-        .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
-        .setColor(passed ? 'Green' : 'Red')
-        .setThumbnail(interaction.user.displayAvatarURL())
-        .addFields(
-            { name: 'Candidato', value: interaction.user.toString(), inline: true },
-            { name: 'Prova Realizada', value: `\`${quizState.quiz.title}\``, inline: true },
-            { name: 'Pontuação', value: `\`${finalScore.toFixed(2)}%\``, inline: true },
-            // O resumo detalhado é adicionado aqui
-            { name: 'Resumo das Respostas', value: summary } 
-        )
-        .setTimestamp()
-        .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
-
-    await channel.send({ embeds: [embed] });
-}
-// ======================================================================
-// A FUNÇÃO QUE TU QUERES EDITAR ESTÁ AQUI
-// ======================================================================
-async function sendLog(interaction, quizState, finalScore, passed) {
-    const logChannelId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_quiz_logs_channel_id'"))?.value;
-    if (!logChannelId) return;
-
-    const channel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
-    if (!channel) return;
-
-    // --- EDITA ESTA EMBED PARA ALTERAR O LOG DA PROVA ---
+    
     const embed = new EmbedBuilder()
         .setTitle(passed ? '✅ Prova Teórica Aprovada' : '❌ Prova Teórica Reprovada')
         .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
@@ -247,7 +207,6 @@ async function sendLog(interaction, quizState, finalScore, passed) {
         .setTimestamp()
         .setFooter({ text: `ID do Candidato: ${interaction.user.id}` });
         
-
     await channel.send({ embeds: [embed] });
 }
 
@@ -276,7 +235,6 @@ const enlistmentHandler = {
             if (customId.startsWith('quiz_admin_')) return this.handleQuizAdmin(interaction);
             if (customId === 'enlistment_start_process') return this.handleStartProcess(interaction);
             
-            // CHAMADAS CORRIGIDAS
             if (customId === 'quiz_public_start') return startQuiz(interaction);
             if (customId.startsWith('quiz_answer_')) return handleQuizAnswer(interaction);
             
@@ -289,8 +247,6 @@ const enlistmentHandler = {
         }
     },
     
-    // Cola aqui o resto do teu ficheiro original, desde a função handleSetup até ao final
-    // (Omitido para não repetir o que já sei que tens)
     async handleSetup(interaction) {
         const action = interaction.customId.split('_').slice(2).join('_');
         if (action === 'manage_quizzes') {
@@ -318,8 +274,8 @@ const enlistmentHandler = {
     async handleQuizAdmin(interaction) {
         const { customId } = interaction;
         if (interaction.isStringSelectMenu()) {
-            await interaction.deferUpdate();
             if (customId === 'quiz_admin_select_action') {
+                await interaction.deferUpdate();
                 const selectedValue = interaction.values[0];
                 if (selectedValue === 'quiz_admin_deactivate') {
                     await db.run("DELETE FROM settings WHERE key = 'enlistment_quiz_id'");
@@ -332,13 +288,16 @@ const enlistmentHandler = {
                 const [selectedQuizId, questionIndex] = interaction.values[0].split('_');
                 const questions = await getQuestions(selectedQuizId);
                 const question = questions?.[questionIndex];
-                if (!question) return interaction.editReply({ content: '❌ Pergunta não encontrada.', components: [], embeds: [] });
+                if (!question) return interaction.update({ content: '❌ Pergunta não encontrada.', components: [], embeds: [] });
                 const embed = new EmbedBuilder().setColor("Yellow").setTitle(`Gerindo Pergunta #${parseInt(questionIndex, 10) + 1}`).setDescription(question.question);
                 const buttons = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`quiz_admin|open_edit_modal|${selectedQuizId}|${questionIndex}`).setLabel("Editar").setStyle(ButtonStyle.Primary),
                     new ButtonBuilder().setCustomId(`quiz_admin|delete_question|${selectedQuizId}|${questionIndex}`).setLabel("Apagar").setStyle(ButtonStyle.Danger)
                 );
-                await interaction.editReply({ embeds: [embed], components: [buttons] });
+                // --- INÍCIO DA CORREÇÃO ---
+                // Troquei o método de resposta para .update(), que é o correto para responder a uma seleção de menu.
+                await interaction.update({ embeds: [embed], components: [buttons] });
+                // --- FIM DA CORREÇÃO ---
             }
             return;
         }
@@ -363,7 +322,7 @@ const enlistmentHandler = {
                 if (action === 'delete_question') {
                     await interaction.deferUpdate();
                     const questions = await getQuestions(quizId);
-                    if (questions && questionIndex < questions.length) {
+                    if (questions && questionIndex >= 0 && questionIndex < questions.length) {
                         questions.splice(questionIndex, 1);
                         await saveQuestions(quizId, questions);
                     }
@@ -372,7 +331,7 @@ const enlistmentHandler = {
                 return;
             }
             const oldParts = customId.split('_');
-            const oldAction = oldParts[2];
+            const oldAction = oldParts.length > 2 ? oldParts[2] : null;
             if (oldAction === 'create') {
                 const modal = new ModalBuilder().setCustomId('quiz_admin_create_modal').setTitle('Criar Nova Prova');
                 modal.addComponents(
@@ -388,7 +347,8 @@ const enlistmentHandler = {
                 return await interaction.editReply(await getQuizManagementPayload(db, oldParts[3]));
             }
             if (oldAction === 'add') {
-                const modal = new ModalBuilder().setCustomId(`quiz_admin_add_question_modal_${oldParts[4]}`).setTitle('Adicionar Nova Pergunta');
+                const quizId = oldParts[oldParts.length - 1];
+                const modal = new ModalBuilder().setCustomId(`quiz_admin_add_question_modal_${quizId}`).setTitle('Adicionar Nova Pergunta');
                  modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('question_text').setLabel("Enunciado da Pergunta").setStyle(TextInputStyle.Paragraph).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('options').setLabel("Alternativas (uma por linha)").setStyle(TextInputStyle.Paragraph).setRequired(true)),
@@ -397,7 +357,7 @@ const enlistmentHandler = {
                 return await interaction.showModal(modal);
             }
             if (oldAction === 'edit') {
-                const quizId = oldParts[4];
+                const quizId = oldParts[oldParts.length - 1];
                 const questions = await getQuestions(quizId);
                 if (!questions || questions.length === 0) return interaction.reply({ content: 'Não há perguntas para editar.', ephemeral: true });
                 const options = questions.map((q, index) => ({ label: `Pergunta #${index + 1}: ${q.question.substring(0, 80)}`, value: `${quizId}_${index}` }));
@@ -405,7 +365,7 @@ const enlistmentHandler = {
                 return await interaction.reply({ content: 'Selecione uma pergunta para gerir:', components: [selectMenu], ephemeral: true });
             }
             if (oldAction === 'delete') {
-                const quizId = oldParts[4];
+                const quizId = oldParts[oldParts.length - 1];
                 if (oldParts[3] === 'quiz') {
                     const confirmButton = new ButtonBuilder().setCustomId(`quiz_admin_delete_confirm_${quizId}`).setLabel('Sim, Apagar Prova').setStyle(ButtonStyle.Danger);
                     const cancelButton = new ButtonBuilder().setCustomId('delete_cancel').setLabel('Cancelar').setStyle(ButtonStyle.Secondary);
