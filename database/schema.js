@@ -168,7 +168,8 @@ const schemaSQL = `
         title TEXT,
         status TEXT DEFAULT 'agendada',
         voice_channel_id VARCHAR(255),
-        control_message_id VARCHAR(255)
+        control_message_id VARCHAR(255),
+        last_reminder_sent_at INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS rank_requirements (
