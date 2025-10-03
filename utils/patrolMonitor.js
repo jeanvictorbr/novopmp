@@ -69,15 +69,8 @@ async function patrolMonitor(client) {
         const activeSessions = await db.all('SELECT * FROM patrol_sessions WHERE status = $1', ['active']);
         if (activeSessions.length === 0) return;
 
-        const settings = await db.all('SELECT * FROM settings');
-        const settingsMap = new Map(settings.map(s => [s.key, s.value]));
-        const copomChannelId = settingsMap.get('copom_channel_id');
-        if (!copomChannelId) return;
-
         const guild = client.guilds.cache.first();
         if (!guild) return;
-        
-        const copomChannel = await guild.channels.fetch(copomChannelId).catch(() => null);
 
         for (const session of activeSessions) {
             const member = await guild.members.fetch(session.user_id).catch(() => null);
@@ -97,12 +90,6 @@ async function patrolMonitor(client) {
                         await endPatrolSession(guild, member.user, session, 'Não retornou ao canal de voz da equipe.');
                         await updateCopomPanel(client);
                         await dashboardMonitor(client);
-                    } else if (timeSinceWarning >= 100 && timeSinceWarning < 120) { // Contagem regressiva nos últimos 20 segundos
-                         const remainingTime = 120 - timeSinceWarning;
-                         const privateChannel = await guild.channels.fetch(session.private_channel_id).catch(() => null);
-                         if (privateChannel) {
-                             await privateChannel.send(`⚠️ **CONT. REGRESSIVA:** ${remainingTime} segundos para o ponto ser encerrado.`).catch(console.error);
-                         }
                     }
                 } else {
                     const warningTime = now;
@@ -110,13 +97,18 @@ async function patrolMonitor(client) {
                     
                     const privateChannel = await guild.channels.fetch(session.private_channel_id).catch(() => null);
                     if (privateChannel) {
-                         await privateChannel.send({ 
+                        // --- INÍCIO DA MODIFICAÇÃO ---
+                        await privateChannel.send({ 
                             content: `⚠️ <@${member.user.id}>, você se desconectou do canal da sua equipe. **Retorne em 2 minutos ou seu ponto será encerrado automaticamente.**`,
-                         }).catch(console.error);
+                        }).catch(console.error);
+                        
+                        // Mensagem adicional com o link clicável para o canal
+                        await privateChannel.send(`> Clique aqui para entrar no canal da sua equipe: <#${session.team_channel_id}>`).catch(console.error);
+                        // --- FIM DA MODIFICAÇÃO ---
                     }
                 }
             } else if (isInCorrectChannel && session.warning_sent_at) {
-                await db.run('UPDATE patrol_sessions SET warning_sent_at = NULL WHERE user_id = $1', [session.user.id]);
+                await db.run('UPDATE patrol_sessions SET warning_sent_at = NULL WHERE user_id = $1', [session.user_id]);
                 const privateChannel = await guild.channels.fetch(session.private_channel_id).catch(() => null);
                 if (privateChannel) {
                     await privateChannel.send({ content: '✅ Bem-vindo de volta, o aviso foi cancelado.' }).catch(console.error);
