@@ -1,6 +1,7 @@
 const { getCourseEnrollmentDashboardPayload } = require('../../../views/setup_views.js');
 const db = require('../../../database/db.js');
 const { EmbedBuilder } = require('discord.js');
+const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js'); // Importar o atualizador do painel
 
 async function sendCertificationNotification(interaction, member, course) {
     const timestamp = Math.floor(Date.now() / 1000);
@@ -70,11 +71,19 @@ module.exports = {
                 await sendCertificationNotification(interaction, member, course);
             }
 
-            // --- CORREÇÃO DO BUG ---
+            // --- INÍCIO DA MODIFICAÇÃO ---
+            // Como todos foram certificados, a turma está vazia.
+            // Vamos marcar todos os eventos agendados para este curso como finalizados.
+            await db.run("UPDATE academy_events SET status = 'finalizada' WHERE course_id = $1 AND status != 'finalizada'", [courseId]);
+
+            // Força a atualização do painel público para remover a aula da vitrine
+            await updateAcademyPanel(interaction.client);
+            // --- FIM DA MODIFICAÇÃO ---
+
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, []);
             await interaction.editReply(updatedDashboard);
             
-            await interaction.followUp({ content: `✅ **${validMembers.length}** oficiais foram certificados e notificados. O painel foi atualizado.`, ephemeral: true });
+            await interaction.followUp({ content: `✅ **${validMembers.length}** oficiais foram certificados e notificados. A aula foi removida da vitrine.`, ephemeral: true });
 
         } catch (error) {
             console.error("Erro ao certificar todos:", error);
