@@ -54,6 +54,10 @@ async function handleManualRoleRemove(member, removedRoles) {
         const careerRoleIds = new Set(careerRoles.map(r => r.role_id));
         const courseRoles = await db.all('SELECT course_id, role_id FROM academy_courses');
         const medalRoles = await db.all('SELECT medal_id, role_id FROM decorations_medals');
+        
+        // --- INÍCIO DA CORREÇÃO ---
+        const recruitRoleId = (await db.get("SELECT value FROM settings WHERE key = 'enlistment_recruit_role_id'"))?.value;
+        // --- FIM DA CORREÇÃO ---
 
         for (const role of removedRoles.values()) {
             // Verifica se era um cargo de CARREIRA e remove do histórico de promoções
@@ -75,6 +79,14 @@ async function handleManualRoleRemove(member, removedRoles) {
                 await db.run('DELETE FROM user_decorations WHERE user_id = $1 AND medal_id = $2', [member.id, medalMatch.medal_id]);
                 console.log(`[ManualRole] Condecoração ID "${medalMatch.medal_id}" removida para ${member.user.tag}.`);
             }
+            
+            // --- INÍCIO DA CORREÇÃO ---
+            // Verifica se era o cargo de RECRUTA e remove a ficha de alistamento
+            if (recruitRoleId && role.id === recruitRoleId) {
+                await db.run('DELETE FROM enlistment_requests WHERE user_id = $1', [member.id]);
+                console.log(`[ManualRole] Ficha de alistamento de ${member.user.tag} removida devido à remoção manual do cargo de recruta.`);
+            }
+            // --- FIM DA CORREÇÃO ---
         }
     } catch (error) {
         console.error(`[ManualRole] Erro ao processar REMOÇÃO de cargos para ${member.user.tag}:`, error);
