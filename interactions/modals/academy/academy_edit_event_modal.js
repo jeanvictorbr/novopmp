@@ -17,10 +17,14 @@ module.exports = {
 
       if (isNaN(eventTime.getTime())) return await interaction.editReply('❌ Data ou horário inválido.');
 
+      // --- CORREÇÃO APLICADA AQUI ---
+      // Agora, ao editar, o status da aula é redefinido para 'agendada',
+      // garantindo que ela seja reprocessada corretamente pelo monitor.
       await db.run(
-        'UPDATE academy_events SET title = $1, event_time = $2 WHERE event_id = $3',
+        "UPDATE academy_events SET title = $1, event_time = $2, status = 'agendada' WHERE event_id = $3",
         [title, Math.floor(eventTime.getTime() / 1000), eventId]
       );
+      // --- FIM DA CORREÇÃO ---
       
       await updateAcademyPanel(interaction.client);
       await interaction.editReply({ content: '✅ Aula atualizada com sucesso! O painel público foi sincronizado.' });
