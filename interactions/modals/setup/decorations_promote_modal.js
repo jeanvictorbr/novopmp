@@ -17,26 +17,27 @@ module.exports = {
         }
 
         try {
-            // --- INÍCIO DA MODIFICAÇÃO ---
-            // Passo 1: Adicionar o novo cargo
-            await officer.roles.add(newRole);
-
-            // Passo 2: Descobrir e remover o cargo anterior
-            const rankRequirement = await db.get('SELECT previous_role_id FROM rank_requirements WHERE role_id = $1', [newRoleId]);
-            if (rankRequirement && rankRequirement.previous_role_id) {
-                const previousRole = await interaction.guild.roles.fetch(rankRequirement.previous_role_id).catch(() => null);
-                if (previousRole && officer.roles.cache.has(previousRole.id)) {
-                    await officer.roles.remove(previousRole, `Promovido para ${newRole.name}`);
-                }
-            }
-            // --- FIM DA MODIFICAÇÃO ---
-
+            // --- INÍCIO DA CORREÇÃO ---
+            // Passo 1: Registrar a promoção no banco de dados PRIMEIRO
             const promotionTimestamp = Math.floor(Date.now() / 1000);
             await db.run(
                 'INSERT INTO rank_history (user_id, role_id, promoted_at) VALUES ($1, $2, $3)',
                 [userId, newRoleId, promotionTimestamp]
             );
+
+            // Passo 2: Adicionar o novo cargo ao oficial
+            await officer.roles.add(newRole);
+
+            // Passo 3: Descobrir e remover o cargo anterior
+            const rankRequirement = await db.get('SELECT previous_role_id FROM rank_requirements WHERE role_id = $1', [newRoleId]);
+            if (rankRequirement && rankRequirement.previous_role_id) {
+                if (officer.roles.cache.has(rankRequirement.previous_role_id)) {
+                    await officer.roles.remove(rankRequirement.previous_role_id, `Promovido para ${newRole.name}`);
+                }
+            }
+            // --- FIM DA CORREÇÃO ---
             
+            // Lógica de anúncio (permanece a mesma)
             const channelId = (await db.get("SELECT value FROM settings WHERE key = 'decorations_channel_id'"))?.value;
             if (channelId) {
                 const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
