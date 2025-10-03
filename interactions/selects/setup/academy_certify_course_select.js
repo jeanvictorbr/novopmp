@@ -11,14 +11,16 @@ module.exports = {
       const course = await db.get('SELECT * FROM academy_courses WHERE course_id = $1', [courseId]);
       const enrollments = await db.all('SELECT * FROM academy_enrollments WHERE course_id = $1', [courseId]);
 
-      if (!course || enrollments.length === 0) {
+      if (!course) {
         return await interaction.editReply({ 
-          content: '❌ Não há inscritos para este curso ou o curso não foi encontrado.', 
+          content: '❌ O curso selecionado não foi encontrado.', 
           components: []
         });
       }
 
-      const payload = await getCourseEnrollmentDashboardPayload(course, interaction.guild, enrollments);
+      // --- CORREÇÃO APLICADA AQUI ---
+      // A ordem dos argumentos agora está correta, passando 'db' primeiro.
+      const payload = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, enrollments);
       await interaction.editReply(payload);
 
     } catch (error) {

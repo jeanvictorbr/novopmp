@@ -150,17 +150,14 @@ async function getCourseEnrollmentDashboardPayload(db, guild, course, enrollment
   if (enrollments.length > 0) {
     embed.setDescription('Gerencie individualmente os oficiais inscritos ou aprove todos de uma vez.');
     
-    for (const enrollment of enrollments) {
+    // Limita a exibição para no máximo 5 membros por vez para não sobrecarregar a mensagem
+    for (const enrollment of enrollments.slice(0, 5)) {
         const member = await guild.members.fetch(enrollment.user_id).catch(() => null);
         if (member) {
-            embed.addFields({
-                name: member.displayName,
-                value: `Inscrito em: <t:${enrollment.enrollment_date}:d>`,
-                inline: false
-            });
+            // Adiciona uma linha de botões para cada membro
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`academy_approve_${course.course_id}_${member.id}`).setLabel('Aprovar').setStyle(ButtonStyle.Success).setEmoji('✅'),
-                new ButtonBuilder().setCustomId(`academy_reject_${course.course_id}_${member.id}`).setLabel('Reprovar').setStyle(ButtonStyle.Danger).setEmoji('❌')
+                new ButtonBuilder().setCustomId(`academy_approve_${course.course_id}_${member.id}`).setLabel(`Aprovar ${member.displayName}`).setStyle(ButtonStyle.Success).setEmoji('✅'),
+                new ButtonBuilder().setCustomId(`academy_reject_${course.course_id}_${member.id}`).setLabel(`Reprovar ${member.displayName}`).setStyle(ButtonStyle.Danger).setEmoji('❌')
             );
             components.push(row);
         }
@@ -170,13 +167,14 @@ async function getCourseEnrollmentDashboardPayload(db, guild, course, enrollment
   }
 
   const generalActions = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`academy_certify_all_${course.course_id}`).setLabel('Aprovar Todos').setStyle(ButtonStyle.Primary).setEmoji('🎖️').setDisabled(enrollments.length === 0),
+    new ButtonBuilder().setCustomId(`academy_certify_all_${course.course_id}`).setLabel('Aprovar Todos os Visíveis').setStyle(ButtonStyle.Primary).setEmoji('🎖️').setDisabled(enrollments.length === 0),
     new ButtonBuilder().setCustomId('back_to_academy_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
   );
   components.push(generalActions);
 
   return { embeds: [embed], components: components };
 }
+
 
 async function getQuizHubPayload(db) {
     const quizzes = await db.all("SELECT quiz_id, title FROM enlistment_quizzes ORDER BY title ASC");
