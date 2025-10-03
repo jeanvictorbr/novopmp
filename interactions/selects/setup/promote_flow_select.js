@@ -4,7 +4,6 @@ const db = require('../../../database/db.js');
 module.exports = {
     customId: (customId) => customId.startsWith('promote_select_'),
     async execute(interaction) {
-        // Assegura que a interação não falhe por tempo
         await interaction.deferUpdate();
 
         const parts = interaction.customId.split('_');
@@ -22,16 +21,13 @@ module.exports = {
                 .sort((a, b) => b.position - a.position)
                 .first();
 
-            // --- INÍCIO DA NOVA LÓGICA DE FILTRAGEM ---
             const promotableRoleIds = [];
             if (!memberHighestRole) {
-                // Se o membro não tem cargo de carreira, mostra todos os cargos de carreira como opção
                 interaction.guild.roles.cache
                     .filter(role => allCareerRoleIds.has(role.id))
                     .sort((a, b) => a.position - b.position)
                     .forEach(role => promotableRoleIds.push(role.id));
             } else {
-                // Se ele tem um cargo, percorre a cadeia de promoções a partir do cargo atual
                 let currentIdInChain = memberHighestRole.id;
                 const visited = new Set(); 
 
@@ -60,21 +56,29 @@ module.exports = {
                     value: role.id,
                 }));
 
-            // Lógica para a sugestão (placeholder)
-            let placeholder = 'Selecione o NOVO cargo do oficial...';
-            if (roleOptions.length > 0) {
-                placeholder = `Sugestão: Promover para ${roleOptions[0].label}`;
+            // --- INÍCIO DA MODIFICAÇÃO DE TEXTO ---
+            const nextRole = roleOptions.length > 0 ? interaction.guild.roles.cache.get(roleOptions[0].value) : null;
+            let contentMessage;
+            let placeholder = 'Selecione o novo cargo...';
+
+            if (memberHighestRole && nextRole) {
+                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}. De acordo com o sistema, a sua próxima patente é ${nextRole.toString()}.\n\nSelecione abaixo o cargo desejado (é possível pular patentes).`;
+                placeholder = `Sugestão: Promover para ${nextRole.name}`;
+            } else if (memberHighestRole) {
+                contentMessage = `O oficial possui o cargo ${memberHighestRole.toString()}, mas não há promoções futuras configuradas para esta patente.`;
+            } else {
+                contentMessage = `O oficial não possui um cargo de carreira. Selecione o cargo de ingresso na lista abaixo.`;
             }
-            
+            // --- FIM DA MODIFICAÇÃO DE TEXTO ---
+
             const menu = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId(`promote_select_newrole_${userId}`)
                     .setPlaceholder(placeholder)
                     .addOptions(roleOptions.slice(0, 25))
             );
-            // --- FIM DA NOVA LÓGICA ---
 
-            await interaction.editReply({ content: '**Etapa 2 de 3:** Selecione o novo cargo. A lista mostra apenas as promoções válidas.', components: [menu] });
+            await interaction.editReply({ content: contentMessage, components: [menu] });
         }
         
         if (step === 'newrole') {
