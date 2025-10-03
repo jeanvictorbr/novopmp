@@ -2,7 +2,8 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = req
 const db = require('../../../database/db.js');
 
 module.exports = {
-  customId: (id) => id.startsWith('academy_edit_event'),
+  // CORREÇÃO APLICADA AQUI
+  customId: (id) => id.startsWith('academy_edit_event|'),
   async execute(interaction) {
     const [, eventId] = interaction.customId.split('|');
     const event = await db.get('SELECT * FROM academy_events WHERE event_id = $1', [eventId]);
