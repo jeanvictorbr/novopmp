@@ -38,7 +38,7 @@ async function academyMonitor(client) {
                 const voiceChannel = await guild.channels.create({
                     name: `🗣️ Aula - ${course.name.substring(0, 80)}`,
                     type: ChannelType.GuildVoice,
-                    parent: thread.parent.parentId, 
+                    parent: thread.parent?.parentId, // Adicionado '?' para segurança
                     reason: `Canal temporário para a aula ID: ${event.event_id}`
                 });
                 await db.run("UPDATE academy_events SET voice_channel_id = $1 WHERE event_id = $2", [voiceChannel.id, event.event_id]);
@@ -54,18 +54,12 @@ async function academyMonitor(client) {
                 continue;
             }
             
-            // Lógica de lembretes (a partir de 2 horas antes)
             if (timeUntilStart > 1800 && timeUntilStart <= 7200) { // Entre 30 mins e 2 horas
                 const minutesUntil = Math.round(timeUntilStart / 60);
-
                 if (minutesUntil % 30 === 0 && minutesUntil > 30 && minutesUntil !== (event.last_reminder_sent_at || 0)) {
-                    // --- INÍCIO DA MODIFICAÇÃO ---
                     const enrollments = await db.all('SELECT user_id FROM academy_enrollments WHERE course_id = $1', [event.course_id]);
                     const mentionString = enrollments.map(e => `<@${e.user_id}>`).join(' ');
-                    
                     await thread.send(`${mentionString}\n🔔 **LEMBRETE:** A aula **${event.title}** começa em aproximadamente **${minutesUntil} minutos**!`);
-                    // --- FIM DA MODIFICAÇÃO ---
-                    
                     await db.run("UPDATE academy_events SET last_reminder_sent_at = $1 WHERE event_id = $2", [minutesUntil, event.event_id]);
                 }
             }
@@ -79,8 +73,13 @@ async function academyMonitor(client) {
             
             const enrollments = await db.all('SELECT * FROM academy_enrollments WHERE course_id = $1', [event.course_id]);
             if (enrollments.length === 0) continue;
-
+            
+            // --- INÍCIO DA CORREÇÃO ---
+            // Adicionada uma verificação de segurança para garantir que 'voiceChannel.members' existe.
+            if (!voiceChannel.members) continue;
             const membersInCallIds = new Set(voiceChannel.members.map(m => m.id));
+            // --- FIM DA CORREÇÃO ---
+
             const timeSinceStart = now - event.event_time;
 
             if (event.status === 'iniciando' && timeSinceStart >= 1200) {
