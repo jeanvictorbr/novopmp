@@ -22,9 +22,8 @@ async function generateRankingEmbed(page, interaction) {
         if (userInRanking) {
             userInRanking.total_seconds += activeSeconds;
         } else {
-            if (rankingData.length < 40) { // Limita para não adicionar infinitos usuários
-                 rankingData.push({ user_id: active.user_id, total_seconds: activeSeconds });
-            }
+            // Adiciona usuários que só têm sessão ativa e nenhum histórico
+            rankingData.push({ user_id: active.user_id, total_seconds: activeSeconds });
         }
     }
 
@@ -42,7 +41,6 @@ async function generateRankingEmbed(page, interaction) {
     const fields = await Promise.all(paginatedData.map(async (entry, index) => {
         const member = await interaction.guild.members.fetch(entry.user_id).catch(() => ({ displayName: 'Oficial Desconhecido' }));
 
-        // --- LÓGICA DE TEMPO ATUALIZADA ---
         const total_seconds = Math.floor(entry.total_seconds);
         const hours = Math.floor(total_seconds / 3600);
         const minutes = Math.floor((total_seconds % 3600) / 60);
@@ -60,24 +58,21 @@ async function generateRankingEmbed(page, interaction) {
         .setColor('Gold')
         .setTitle('🏆 Ranking de Horas de Patrulha')
         .setDescription('Os 40 oficiais com mais horas de serviço na corporação.')
-        .setFields(fields.length > 0 ? { name: 'Nenhum patrulheiro no ranking', value: 'Comece a patrulhar para aparecer aqui!' } : fields)
+        // --- LINHA CORRIGIDA ---
+        .setFields(fields.length > 0 ? fields : { name: 'Nenhum patrulheiro no ranking', value: 'Comece a patrulhar para aparecer aqui!' })
         .setFooter({ text: `Página ${page} de ${totalPages}` });
 
-    // Lógica dos botões de navegação
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('ranking_prev_page').setLabel('<').setStyle(ButtonStyle.Primary).setDisabled(page === 1),
-        new ButtonBuilder().setCustomId('ranking_next_page').setLabel('>').setStyle(ButtonStyle.Primary).setDisabled(page === totalPages)
+        new ButtonBuilder().setCustomId('ranking_next_page').setLabel('>').setStyle(ButtonStyle.Primary).setDisabled(page >= totalPages)
     );
 
     return { embeds: [embed], components: [row] };
 }
 
-
-// --- Handler principal com lógica de navegação atualizada ---
 module.exports = {
     customId: (id) => id.startsWith('ranking'),
     async execute(interaction) {
-        // Usa deferReply para interações iniciais (botão 'ranking') e deferUpdate para navegação
         if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ ephemeral: true });
         } else if (interaction.isButton()) {
@@ -93,7 +88,7 @@ module.exports = {
             } else if (action === 'ranking_prev_page') {
                 currentPage--;
             } else {
-                currentPage = 1; // Reseta para a primeira página se for o clique inicial
+                currentPage = 1;
             }
             
             const payload = await generateRankingEmbed(currentPage, interaction);
