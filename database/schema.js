@@ -122,7 +122,8 @@ const schemaSQL = `
         awarded_at BIGINT NOT NULL,
         reason TEXT,
         announcement_channel_id VARCHAR(255),
-        announcement_message_id VARCHAR(255)
+        announcement_message_id VARCHAR(255),
+        status VARCHAR(255) DEFAULT 'awarded'
     );
     CREATE TABLE IF NOT EXISTS hierarchy_hidden_roles (
         role_id VARCHAR(255) PRIMARY KEY
