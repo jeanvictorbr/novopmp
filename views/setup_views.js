@@ -131,6 +131,7 @@ async function getAcademyMenuPayload(db) {
     );
 
     const configButtons2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('academy_view_discussions').setLabel('Ver Discussões de Turmas').setStyle(ButtonStyle.Primary).setEmoji('💬'),
         new ButtonBuilder().setCustomId('back_to_main_menu').setLabel('Voltar').setStyle(ButtonStyle.Secondary)
     );
 

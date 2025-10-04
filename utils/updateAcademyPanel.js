@@ -16,7 +16,8 @@ async function updateAcademyPanel(client) {
     const message = await channel.messages.fetch(panelInfo.message_id).catch(() => null);
     if (!message) return;
 
-    // --- LÓGICA DA VITRINE ATUALIZADA ---
+    const now = Math.floor(Date.now() / 1000);
+    
     const scheduledEvents = await db.all(
       `SELECT ae.*, ac.name 
        FROM academy_events ae 
@@ -35,32 +36,33 @@ async function updateAcademyPanel(client) {
 
     const components = [];
     if (scheduledEvents.length > 0) {
-        let eventsDescription = '';
-        let buttonRow = new ActionRowBuilder();
-        
-        scheduledEvents.forEach((event, index) => {
-            let timeText;
-            if (event.status === 'em_progresso') {
-                timeText = `**Status:** 🟢 Acontecendo Agora!`;
-            } else { // 'agendada' ou 'iniciando'
-                timeText = `**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)`;
-            }
-    
-            eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n${timeText}\n`;
-            
-            // Só mostra o botão de inscrever se a aula ainda não começou de fato
-            if (event.status === 'agendada') {
-                buttonRow.addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`academy_enroll_event|${event.event_id}`)
-                        .setLabel(`Inscrever-se na Aula ${index + 1}`)
-                        .setStyle(ButtonStyle.Success)
-                );
-            }
-        });
+      let eventsDescription = '';
+      let buttonRow = new ActionRowBuilder();
+      
+      scheduledEvents.forEach((event, index) => {
+        let timeText;
+        if (event.status === 'em_progresso') {
+            timeText = `**Status:** 🟢 Acontecendo Agora!`;
+        } else { // 'agendada' ou 'iniciando'
+            timeText = `**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)`;
+        }
 
-        embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: eventsDescription });
-        if(buttonRow.components.length > 0) components.push(buttonRow);
+        eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n${timeText}\n`;
+        
+        // --- LÓGICA DO BOTÃO CORRIGIDA ---
+        // O botão agora aparece se o status for 'agendada' OU 'iniciando'
+        if (event.status === 'agendada' || event.status === 'iniciando') {
+            buttonRow.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`academy_enroll_event|${event.event_id}`)
+                    .setLabel(`Inscrever-se na Aula ${index + 1}`)
+                    .setStyle(ButtonStyle.Success)
+            );
+        }
+      });
+
+      embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: eventsDescription });
+      if(buttonRow.components.length > 0) components.push(buttonRow);
 
     } else {
       embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: '`Nenhuma aula agendada no momento. Solicite um curso do catálogo!`' });
