@@ -58,7 +58,10 @@ async function updateAcademyPanel(client) {
                     .setLabel(`Inscrever-se na Aula ${index + 1}`)
                     .setStyle(ButtonStyle.Success)
             );
-            components.push(eventButtons);
+            // Adiciona a fileira de botões ao array de componentes
+            if(!components.some(c => c.components[0].customId === eventButtons.components[0].customId)) {
+                components.push(eventButtons);
+            }
         }
       });
       embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: eventsDescription });
