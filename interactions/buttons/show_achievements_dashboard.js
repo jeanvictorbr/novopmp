@@ -29,21 +29,16 @@ module.exports = {
                 return await interaction.editReply({ content: 'Nenhuma conquista foi configurada pela administração ainda.', embeds: [], components: [] });
             }
 
-            // --- CORREÇÃO APLICADA AQUI ---
             const manualStats = await db.get('SELECT * FROM manual_stats WHERE user_id = $1', [userId]);
-
             const patrolHistory = await db.get('SELECT SUM(duration_seconds) AS total FROM patrol_history WHERE user_id = $1', [userId]);
             const activeSession = await db.get('SELECT start_time FROM patrol_sessions WHERE user_id = $1', [userId]);
             const activeSeconds = activeSession ? now - activeSession.start_time : 0;
-            const totalPatrolHours = Math.floor(((Number(patrolHistory?.total) || 0) + activeSeconds) / 3600) + (manualStats?.manual_patrol_hours || 0);
-
+            const totalPatrolHours = Math.floor(((Number(patrolHistory?.total) || 0) + activeSeconds) / 3600) + (Number(manualStats?.manual_patrol_hours) || 0);
             const recruitsData = await db.get("SELECT COUNT(*) AS total FROM enlistment_requests WHERE recruiter_id = $1 AND status = 'approved'", [userId]);
-            const totalRecruits = (recruitsData?.total || 0) + (manualStats?.manual_recruits || 0);
-
+            const totalRecruits = (Number(recruitsData?.total) || 0) + (Number(manualStats?.manual_recruits) || 0);
             const coursesData = await db.get('SELECT COUNT(*) AS total FROM user_certifications WHERE user_id = $1', [userId]);
-            const totalCourses = (coursesData?.total || 0) + (manualStats?.manual_courses || 0);
-            // --- FIM DA CORREÇÃO ---
-
+            const totalCourses = (Number(coursesData?.total) || 0) + (Number(manualStats?.manual_courses) || 0);
+            
             const progressMap = {
                 patrol_hours: totalPatrolHours,
                 recruits: totalRecruits,
@@ -63,6 +58,7 @@ module.exports = {
                 'courses': { name: 'Cursos Concluídos', icon: '🎓' }
             };
 
+            // --- LÓGICA REVERTIDA PARA O MODO "EXIBIR TUDO" ---
             const achievementsByType = allAchievements.reduce((acc, ach) => {
                 if (!acc[ach.type]) acc[ach.type] = [];
                 acc[ach.type].push(ach);
@@ -78,15 +74,22 @@ module.exports = {
                     const currentProgress = progressMap[ach.type] || 0;
                     
                     if (unlockedData) {
+                        // Se estiver desbloqueada, mostra o status de concluída
                         description += `✅ **${ach.name}**\n*Desbloqueada em <t:${unlockedData.unlocked_at}:d>*\n\n`;
                     } else {
+                        // Se não estiver desbloqueada, mostra o progresso
                         description += `🔒 **${ach.name}**\n*${ach.description}*\n`;
                         description += `Progresso: \`${currentProgress} / ${ach.requirement}\`\n${createProgressBar(currentProgress, ach.requirement)}\n\n`;
                     }
                 });
                 
+                if (description === '') {
+                    description = '`Nenhuma conquista configurada para esta categoria.`';
+                }
+
                 embed.addFields({ name: `${typeInfo.icon} ${typeInfo.name}`, value: description });
             }
+            // --- FIM DA LÓGICA REVERTIDA ---
             
             const backButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
