@@ -59,12 +59,6 @@ const schemaSQL = `
         certified_by VARCHAR(255),
         PRIMARY KEY (user_id, course_id)
     );
-    CREATE TABLE academy_absences (
-        event_id INTEGER NOT NULL,
-        user_id VARCHAR(255) NOT NULL,
-        warning_sent_at BIGINT NOT NULL,
-        PRIMARY KEY (event_id, user_id)
-);
     CREATE TABLE IF NOT EXISTS corregedoria_tickets (
         ticket_id SERIAL PRIMARY KEY,
         guild_id VARCHAR(255),
@@ -138,10 +132,9 @@ const schemaSQL = `
         role_id VARCHAR(255) PRIMARY KEY,
         tag TEXT NOT NULL
     );
-    -- TABELAS DO MÓDULO DE ALISTAMENTO (VERSÃO FINAL) --
     CREATE TABLE IF NOT EXISTS enlistment_requests (
         request_id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL, -- A PALAVRA 'UNIQUE' FOI REMOVIDA DAQUI
+        user_id VARCHAR(255) NOT NULL,
         rp_name TEXT NOT NULL,
         game_id TEXT,
         recruiter_id VARCHAR(255),
@@ -164,7 +157,6 @@ const schemaSQL = `
         passed BOOLEAN NOT NULL,
         attempt_date BIGINT
     );
-
     CREATE TABLE IF NOT EXISTS academy_events (
         event_id SERIAL PRIMARY KEY,
         course_id TEXT REFERENCES academy_courses(course_id) ON DELETE CASCADE,
@@ -178,7 +170,6 @@ const schemaSQL = `
         control_message_id VARCHAR(255),
         last_reminder_sent_at INTEGER
     );
-
     CREATE TABLE IF NOT EXISTS rank_requirements (
         role_id VARCHAR(255) PRIMARY KEY,
         previous_role_id VARCHAR(255) NOT NULL,
@@ -187,35 +178,37 @@ const schemaSQL = `
         required_recruits INTEGER DEFAULT 0,
         required_time_in_rank_days INTEGER DEFAULT 0
     );
-
     CREATE TABLE IF NOT EXISTS rank_history (
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         role_id VARCHAR(255) NOT NULL,
         promoted_at BIGINT NOT NULL
     );
-        -- NOVAS TABELAS PARA O MÓDULO DE CONQUISTAS --
     CREATE TABLE IF NOT EXISTS achievements (
-        achievement_id TEXT PRIMARY KEY, -- Um ID curto, ex: "patrol_100"
+        achievement_id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT NOT NULL,
-        icon TEXT, -- Emoji ou URL de uma imagem pequena
-        type TEXT NOT NULL, -- 'patrol_hours', 'recruits', 'courses', etc.
-        requirement INTEGER NOT NULL -- O valor a ser atingido (ex: 100 para horas, 10 para recrutas)
+        icon TEXT,
+        type TEXT NOT NULL,
+        requirement INTEGER NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS user_achievements (
         user_id VARCHAR(255) NOT NULL,
         achievement_id TEXT NOT NULL REFERENCES achievements(achievement_id) ON DELETE CASCADE,
         unlocked_at BIGINT NOT NULL,
         PRIMARY KEY (user_id, achievement_id)
     );
-        -- NOVA TABELA PARA ESTATÍSTICAS MANUAIS DE ADMIN --
     CREATE TABLE IF NOT EXISTS manual_stats (
         user_id VARCHAR(255) PRIMARY KEY,
         manual_patrol_hours INTEGER DEFAULT 0,
         manual_recruits INTEGER DEFAULT 0,
         manual_courses INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS academy_absences (
+        event_id INTEGER NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
+        warning_sent_at BIGINT NOT NULL,
+        PRIMARY KEY (event_id, user_id)
     );
 `;
 async function initializeDatabase() {
