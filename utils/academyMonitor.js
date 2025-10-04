@@ -34,19 +34,22 @@ async function academyMonitor(client) {
             if (!thread) continue;
 
             if (timeUntilStart > 0 && timeUntilStart <= 1800) { // Janela de 30 minutos
-                if (!thread.parentId || !thread.parent) {
-                    console.error(`[AcademyMonitor] ERRO DE CONFIGURAÇÃO: O canal de discussões para o curso ${course.name} não foi encontrado ou não está em uma categoria. A criação do canal de voz foi abortada.`);
-                    continue;
+                // --- INÍCIO DA CORREÇÃO DEFINITIVA ---
+                if (!thread.parent || !thread.parent.parentId) {
+                    console.error(`[AcademyMonitor] ERRO DE CONFIGURAÇÃO: O canal de discussões '${thread.parent?.name || 'desconhecido'}' não está dentro de uma categoria. A criação do canal de voz foi abortada.`);
+                    continue; // Pula para o próximo evento se a configuração estiver errada
                 }
-                
+
                 await db.run("UPDATE academy_events SET status = 'iniciando' WHERE event_id = $1", [event.event_id]);
                 
                 const voiceChannel = await guild.channels.create({
                     name: `🗣️ Aula - ${course.name.substring(0, 80)}`,
                     type: ChannelType.GuildVoice,
-                    parent: thread.parentId, 
+                    parent: thread.parent.parentId, // USA A ID DA CATEGORIA PAI
                     reason: `Canal temporário para a aula ID: ${event.event_id}`
                 });
+                // --- FIM DA CORREÇÃO DEFINITIVA ---
+
                 await db.run("UPDATE academy_events SET voice_channel_id = $1 WHERE event_id = $2", [voiceChannel.id, event.event_id]);
                 
                 const controlEmbed = new EmbedBuilder().setColor('Green').setTitle('🟢 AULA PRESTES A COMEÇAR!').setDescription(`Atenção, turma! A aula **${event.title}** começará em breve. A entrada no canal de voz é obrigatória.\n\n> **Clique aqui para entrar:** ${voiceChannel.toString()}`).addFields({ name: 'Período de Tolerância', value: 'Você tem **20 minutos** para entrar na chamada. Após isso, sua inscrição será cancelada.' });
@@ -72,7 +75,8 @@ async function academyMonitor(client) {
             }
         }
 
-        const activeEvents = await db.all("SELECT * FROM academy_events WHERE status = 'iniciando' OR status = 'em_progresso'");
+        // Lógica de controle de presença (inalterada)
+        const activeEvents = await db.all("SELECT * FROM academy_events WHERE status IN ('iniciando', 'em_progresso')");
         for (const event of activeEvents) {
             const course = await db.get('SELECT * FROM academy_courses WHERE course_id = $1', [event.course_id]);
             const voiceChannel = await guild.channels.fetch(event.voice_channel_id).catch(() => null);
@@ -85,19 +89,21 @@ async function academyMonitor(client) {
             const timeSinceScheduledStart = now - event.event_time;
 
             if (event.status === 'iniciando') {
+                if (timeSinceScheduledStart >= 0) {
+                    await db.run("UPDATE academy_events SET status = 'em_progresso' WHERE event_id = $1", [event.event_id]);
+                    await updateAcademyPanel(client);
+                }
                 if (timeSinceScheduledStart >= 1200) { 
                     for (const enrollment of enrollments) {
                         if (!membersInCallIds.has(enrollment.user_id)) {
                             await cancelEnrollment(guild, course, enrollment.user_id, 'Ausência no início da aula');
                         }
                     }
-                    await db.run("UPDATE academy_events SET status = 'em_progresso' WHERE event_id = $1", [event.event_id]);
-                    await updateAcademyPanel(client);
                 }
             } else if (event.status === 'em_progresso') {
                 const thread = await guild.channels.fetch(course.thread_id).catch(() => null);
                 if (!thread) continue;
-
+                
                 for (const enrollment of enrollments) {
                     const studentId = enrollment.user_id;
                     const studentAbsence = await db.get("SELECT * FROM academy_absences WHERE event_id = $1 AND user_id = $2", [event.event_id, studentId]);
