@@ -10,16 +10,17 @@ async function updateAcademyPanel(client) {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    const channel = await guild.channels.fetch(panelinfo.channel_id).catch(() => null);
+    // --- CORREÇÃO APLICADA AQUI ---
+    // A variável foi corrigida de 'panelinfo' para 'panelInfo'.
+    const channel = await guild.channels.fetch(panelInfo.channel_id).catch(() => null);
     if (!channel) return;
 
-    const message = await channel.messages.fetch(panelinfo.message_id).catch(() => null);
+    const message = await channel.messages.fetch(panelInfo.message_id).catch(() => null);
+    // --- FIM DA CORREÇÃO ---
     if (!message) return;
 
     const now = Math.floor(Date.now() / 1000);
     
-    // --- INÍCIO DA MODIFICAÇÃO ---
-    // A consulta agora busca por aulas com status 'agendada', 'iniciando', ou 'em_progresso'.
     const scheduledEvents = await db.all(
       `SELECT ae.*, ac.name 
        FROM academy_events ae 
@@ -43,7 +44,6 @@ async function updateAcademyPanel(client) {
       const eventButtons = new ActionRowBuilder();
 
       scheduledEvents.forEach((event, index) => {
-        // Lógica para mudar o texto da data/status
         let timeText;
         if (event.status === 'agendada') {
             timeText = `**Data:** <t:${event.event_time}:F> (<t:${event.event_time}:R>)`;
@@ -53,12 +53,15 @@ async function updateAcademyPanel(client) {
 
         eventsDescription += `\n**${index + 1}. ${event.title}**\n**Curso:** ${event.name}\n${timeText}\n`;
         
-        eventButtons.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`academy_enroll_event|${event.event_id}`)
-                .setLabel(`Inscrever-se na Aula ${index + 1}`)
-                .setStyle(ButtonStyle.Success)
-        );
+        // Apenas adiciona o botão de inscrever se a aula ainda não começou
+        if (event.status === 'agendada') {
+            eventButtons.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`academy_enroll_event|${event.event_id}`)
+                    .setLabel(`Inscrever-se na Aula ${index + 1}`)
+                    .setStyle(ButtonStyle.Success)
+            );
+        }
       });
       embed.addFields({ name: '🗓️ Próximas Aulas Agendadas', value: eventsDescription });
       if(eventButtons.components.length > 0) components.push(eventButtons);
@@ -74,7 +77,6 @@ async function updateAcademyPanel(client) {
         .setEmoji('📚')
     );
     components.push(catalogButton);
-    // --- FIM DA MODIFICAÇÃO ---
 
     await message.edit({ content: '', embeds: [embed], components: components });
   } catch (error) {
