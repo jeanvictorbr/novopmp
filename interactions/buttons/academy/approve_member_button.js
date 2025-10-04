@@ -1,7 +1,7 @@
 const db = require('../../../database/db.js');
 const { getCourseEnrollmentDashboardPayload } = require('../../../views/setup_views.js');
 const { EmbedBuilder } = require('discord.js');
-const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js'); // Importar o atualizador do painel
+const { updateAcademyPanel } = require('../../../utils/updateAcademyPanel.js');
 
 async function sendCertificationNotification(interaction, member, course) {
     const timestamp = Math.floor(Date.now() / 1000);
@@ -64,22 +64,27 @@ module.exports = {
 
             await sendCertificationNotification(interaction, member, course);
 
-            // --- INÍCIO DA MODIFICAÇÃO ---
-            // Verifica se este foi o último aluno
-            const remainingEnrollments = await db.get('SELECT COUNT(*) AS count FROM academy_enrollments WHERE course_id = $1', [courseId]);
-            if (remainingEnrollments.count === 0) {
-                await db.run("UPDATE academy_events SET status = 'finalizada' WHERE course_id = $1 AND status != 'finalizada'", [courseId]);
-                await interaction.followUp({ content: 'ℹ️ Este era o último aluno da turma. A aula agendada foi removida da vitrine.', ephemeral: true });
-            }
-            // --- FIM DA MODIFICAÇÃO ---
-
             const updatedEnrollmentsAfter = await db.all('SELECT * FROM academy_enrollments WHERE course_id = $1', [courseId]);
+
+            if (updatedEnrollmentsAfter.length === 0) {
+                await db.run("UPDATE academy_events SET status = 'finalizada' WHERE course_id = $1 AND status != 'finalizada'", [courseId]);
+                await interaction.followUp({ content: 'ℹ️ Este era o último aluno da turma. A aula foi finalizada e a discussão será limpa.', ephemeral: true });
+                if (course.thread_id) {
+                    const thread = await interaction.guild.channels.fetch(course.thread_id).catch(() => null);
+                    if (thread) {
+                        const messages = await thread.messages.fetch({ limit: 100 });
+                        if(messages.size > 0) await thread.bulkDelete(messages).catch(console.error);
+                        await thread.send('✅ Turma finalizada e canal de discussão limpo para a próxima turma.');
+                    }
+                }
+            }
+
             const updatedDashboard = await getCourseEnrollmentDashboardPayload(db, interaction.guild, course, updatedEnrollmentsAfter);
             await interaction.editReply(updatedDashboard);
             
             await interaction.followUp({ content: `✅ ${member.displayName} foi aprovado(a) com sucesso!`, ephemeral: true });
             
-            await updateAcademyPanel(interaction.client); // Força a atualização final do painel público
+            await updateAcademyPanel(interaction.client);
 
         } catch (error) {
             console.error("Erro ao aprovar oficial:", error);

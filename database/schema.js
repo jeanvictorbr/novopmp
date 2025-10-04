@@ -59,6 +59,12 @@ const schemaSQL = `
         certified_by VARCHAR(255),
         PRIMARY KEY (user_id, course_id)
     );
+    CREATE TABLE academy_absences (
+        event_id INTEGER NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
+        warning_sent_at BIGINT NOT NULL,
+        PRIMARY KEY (event_id, user_id)
+);
     CREATE TABLE IF NOT EXISTS corregedoria_tickets (
         ticket_id SERIAL PRIMARY KEY,
         guild_id VARCHAR(255),
