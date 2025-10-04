@@ -22,13 +22,16 @@ module.exports = {
       const [hour, minute] = timeString.split(':').map(Number);
       const eventTime = new Date(year, month - 1, day, hour, minute);
       
-      if (isNaN(eventTime.getTime()) || eventTime.getTime() < Date.now()) {
-        return await interaction.editReply('❌ Data ou horário inválido. Use o formato DD/MM/AAAA e HH:MM e garanta que seja uma data futura.');
+      // --- INÍCIO DA MODIFICAÇÃO ---
+      // A verificação de "data futura" foi removida para evitar problemas de fuso horário.
+      // A verificação de formato inválido (isNaN) foi mantida.
+      if (isNaN(eventTime.getTime())) {
+          return await interaction.editReply('❌ Data ou horário inválido. Use o formato DD/MM/AAAA e HH:MM.');
       }
+      // --- FIM DA MODIFICAÇÃO ---
 
       const eventTimestamp = Math.floor(eventTime.getTime() / 1000);
 
-      // Atualiza a query para incluir o status inicial
       await db.run(
         'INSERT INTO academy_events (course_id, guild_id, scheduled_by, scheduled_at, event_time, title, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [courseId, interaction.guild.id, interaction.user.id, Math.floor(Date.now() / 1000), eventTimestamp, title, 'agendada']
@@ -40,7 +43,6 @@ module.exports = {
             const enrollments = await db.all('SELECT user_id FROM academy_enrollments WHERE course_id = $1', [courseId]);
             const mentionString = enrollments.map(e => `<@${e.user_id}>`).join(' ');
 
-            // --- A NOVA EMBED DE ANÚNCIO ---
             const notificationEmbed = new EmbedBuilder()
                 .setColor('Gold')
                 .setTitle('📢 BOAS NOTÍCIAS, TURMA! 📢')

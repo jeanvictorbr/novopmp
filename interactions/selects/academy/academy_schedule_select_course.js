@@ -11,8 +11,22 @@ module.exports = {
       return await interaction.reply({ content: '❌ O curso selecionado não foi encontrado.', ephemeral: true });
     }
 
+    // --- INÍCIO DA MODIFICAÇÃO ---
+    // Pega a data e hora atuais e ajusta para o fuso de Brasília (UTC-3)
+    const now = new Date();
+    now.setHours(now.getUTCHours() - 3);
+
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // Mês é indexado em 0
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    const currentDate = `${day}/${month}/${year}`;
+    const currentTime = `${hours}:${minutes}`;
+    // --- FIM DA MODIFICAÇÃO ---
+
     const modal = new ModalBuilder()
-      // O ID do modal agora inclui o ID do curso para ser pego pelo próximo handler
       .setCustomId(`academy_schedule_course_modal|${courseId}`)
       .setTitle(`Agendar Aula para: ${course.name}`);
 
@@ -27,14 +41,14 @@ module.exports = {
       .setCustomId('event_date')
       .setLabel('Data da Aula (DD/MM/AAAA)')
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 25/12/2025')
+      .setValue(currentDate) // Campo pré-preenchido
       .setRequired(true);
 
     const timeInput = new TextInputBuilder()
       .setCustomId('event_time')
-      .setLabel('Horário da Aula (HH:MM)')
+      .setLabel('Horário (HH:MM) - Fuso de Brasília') // Adicionado aviso de fuso
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 20:30')
+      .setValue(currentTime) // Campo pré-preenchido
       .setRequired(true);
 
     modal.addComponents(
@@ -43,7 +57,6 @@ module.exports = {
       new ActionRowBuilder().addComponents(timeInput)
     );
 
-    // Mostra o formulário para o usuário
     await interaction.showModal(modal);
   },
 };
